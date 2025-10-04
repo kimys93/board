@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # MySQL 데이터베이스
+  db:
+    image: mysql:8.0
+    container_name: board_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: board_db
+      MYSQL_USER: board_user
+      MYSQL_PASSWORD: board_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - board_network
+
+  # Node.js 웹 서버
+  web:
+    build: .
+    container_name: board_web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=db
+      - DB_USER=board_user
+      - DB_PASSWORD=board_password
+      - DB_NAME=board_db
+      - JWT_SECRET=your_jwt_secret_key_here
+    depends_on:
+      - db
+    volumes:
+      - ./uploads:/app/uploads
+      - ./public:/app/public
+    networks:
+      - board_network
+
+  # Jenkins CI/CD
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: board_jenkins
+    restart: always
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    environment:
+      - JENKINS_OPTS=--httpPort=8080
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - board_network
+
+volumes:
+  db_data:
+  jenkins_data:
+
+networks:
+  board_network:
+    driver: bridge
