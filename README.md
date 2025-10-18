@@ -1,6 +1,7 @@
 # 게시판 애플리케이션
 
-Node.js, Express, MySQL을 사용한 풀스택 게시판 애플리케이션입니다.
+Node.js, Express, MySQL을 사용한 테스트 자동화 코드 연습을 위한 게시판 애플리케이션입니다.
+해당 코드는 커서 AI로 구성하였으며, 코드 그대로 클론 시 일부 에러가 발생할 수 있으니 주의바랍니다.
 
 ## 🚀 주요 기능
 
@@ -18,9 +19,6 @@ Node.js, Express, MySQL을 사용한 풀스택 게시판 애플리케이션입�
 - **Node.js** - JavaScript 런타임
 - **Express** - 웹 프레임워크
 - **MySQL** - 데이터베이스
-- **JWT** - 인증 토큰
-- **Multer** - 파일 업로드
-- **Bcrypt** - 비밀번호 해시
 
 ### Frontend
 - **HTML5/CSS3/JavaScript** - 기본 웹 기술
@@ -29,7 +27,6 @@ Node.js, Express, MySQL을 사용한 풀스택 게시판 애플리케이션입�
 
 ### DevOps
 - **Docker** - 컨테이너화
-- **Docker Compose** - 멀티 컨테이너 오케스트레이션
 - **Jenkins** - CI/CD
 
 ## 📁 프로젝트 구조
@@ -152,62 +149,5 @@ docker exec -it board_db mysql -u board_user -p board_db
 - `GET /api/upload/:id` - 파일 다운로드
 - `DELETE /api/upload/:id` - 파일 삭제
 
-## 🐳 Docker 서비스 구성
 
-### 서비스 목록
 
-1. **db** - MySQL 8.0 데이터베이스
-2. **web** - Node.js 웹 서버
-3. **jenkins** - Jenkins CI/CD
-
-### 포트 매핑
-
-- `3000` - Node.js 웹 서버
-- `3306` - MySQL
-- `8080` - Jenkins
-- `50000` - Jenkins Agent
-
-## 🔒 보안 기능
-
-- JWT 기반 인증
-- 비밀번호 해시화 (bcrypt)
-- SQL 인젝션 방지 (prepared statements)
-- XSS 방지 (입력값 이스케이프)
-- 보안 헤더 설정
-
-## 📱 반응형 디자인
-
-- Bootstrap 5 사용
-- 모바일 친화적 UI
-- 다크 모드 지원
-- 터치 친화적 인터페이스
-
-## 🚨 문제 해결
-
-### 일반적인 문제들
-
-1. **포트 충돌**: 다른 애플리케이션이 같은 포트를 사용하는 경우
-2. **데이터베이스 연결 실패**: MySQL 컨테이너가 완전히 시작되지 않은 경우
-
-### 로그 확인
-
-```bash
-# 모든 서비스 로그
-docker-compose logs
-
-# 특정 서비스 로그
-docker-compose logs web
-docker-compose logs db
-```
-
-## 📄 라이선스
-
-MIT License
-
-## 🤝 기여하기
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
