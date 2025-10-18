@@ -13,6 +13,7 @@ services:
       MYSQL_PASSWORD: board_password
     ports:
       - "3306:3306"
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     volumes:
       - db_data:/var/lib/mysql
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -27,7 +28,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - DB_HOST=db
       - DB_USER=board_user
       - DB_PASSWORD=board_password
@@ -38,6 +39,10 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./public:/app/public
+      - ./routes:/app/routes
+      - ./config:/app/config
+      - ./middleware:/app/middleware
+      - ./server.js:/app/server.js
     networks:
       - board_network
 

@@ -1,4 +1,4 @@
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise');
 require('dotenv').config();
 
 const dbConfig = {
@@ -7,6 +7,7 @@ const dbConfig = {
     password: process.env.DB_PASSWORD || 'board_password',
     database: process.env.DB_NAME || 'board_db',
     port: process.env.DB_PORT || 3306,
+    charset: 'utf8mb4',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
@@ -17,13 +18,14 @@ const dbConfig = {
 const pool = mysql.createPool(dbConfig);
 
 // 연결 테스트
-pool.getConnection((err, connection) => {
-    if (err) {
+(async () => {
+    try {
+        const connection = await pool.getConnection();
+        console.log('데이터베이스 연결 성공');
+        connection.release();
+    } catch (err) {
         console.error('데이터베이스 연결 실패:', err);
-        return;
     }
-    console.log('데이터베이스 연결 성공');
-    connection.release();
-});
+})();
 
 module.exports = pool;

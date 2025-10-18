@@ -1,5 +1,9 @@
 -- 데이터베이스 초기화 스크립트
 
+-- 문자셋 설정
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
+
 USE board_db;
 
 -- 사용자 테이블

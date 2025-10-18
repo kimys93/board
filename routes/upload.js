@@ -20,33 +20,53 @@ const storage = multer.diskStorage({
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+        const ext = path.extname(file.originalname);
+        cb(null, 'file-' + uniqueSuffix + ext);
     }
 });
 
 const fileFilter = (req, file, cb) => {
-    // 허용되는 파일 타입
-    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt|zip|rar/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
+    // 이미지 파일만 허용
+    const allowedExtensions = /\.(jpeg|jpg|png|gif|webp)$/i;
+    const allowedMimeTypes = [
+        'image/jpeg',
+        'image/jpg',
+        'image/png', 
+        'image/gif',
+        'image/webp'
+    ];
 
-    if (mimetype && extname) {
+    const extname = allowedExtensions.test(file.originalname);
+    const mimetype = allowedMimeTypes.includes(file.mimetype);
+
+    if (extname && mimetype) {
         return cb(null, true);
     } else {
-        cb(new Error('지원되지 않는 파일 형식입니다.'));
+        cb(new Error('이미지 파일만 업로드할 수 있습니다. (JPG, PNG, GIF, WEBP)'));
     }
 };
 
 const upload = multer({
     storage: storage,
     limits: {
-        fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024 // 10MB
+        fileSize: 10 * 1024 * 1024 // 10MB
     },
     fileFilter: fileFilter
 });
 
 // 파일 업로드
-router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
+router.post('/', authenticateToken, (req, res, next) => {
+    upload.single('file')(req, res, (err) => {
+        if (err) {
+            console.error('파일 업로드 오류:', err);
+            return res.status(400).json({
+                success: false,
+                message: err.message
+            });
+        }
+        next();
+    });
+}, async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({
@@ -97,7 +117,7 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
             [
                 postId,
                 req.file.filename,
-                req.file.originalname,
+                Buffer.from(req.file.originalname, 'latin1').toString('utf8'), // 인코딩 변환
                 req.file.path,
                 req.file.size,
                 req.file.mimetype
@@ -130,14 +150,14 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
     }
 });
 
-// 파일 다운로드
-router.get('/:id', async (req, res) => {
+// 파일 다운로드 (파일명으로)
+router.get('/:filename', async (req, res) => {
     try {
-        const fileId = req.params.id;
+        const filename = req.params.filename;
 
         const [files] = await pool.execute(
-            'SELECT filename, original_name, file_path, mime_type FROM attachments WHERE id = ?',
-            [fileId]
+            'SELECT filename, original_name, file_path, mime_type FROM attachments WHERE filename = ?',
+            [filename]
         );
 
         if (files.length === 0) {
@@ -156,7 +176,9 @@ router.get('/:id', async (req, res) => {
             });
         }
 
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.original_name)}"`);
+        // 파일명 인코딩 처리
+        const encodedFilename = encodeURIComponent(file.original_name);
+        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
         res.setHeader('Content-Type', file.mime_type);
         res.sendFile(path.resolve(file.file_path));
     } catch (error) {

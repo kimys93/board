@@ -26,10 +26,11 @@ router.get('/', async (req, res) => {
             `SELECT COUNT(*) as total FROM posts p ${whereClause}`,
             queryParams
         );
+        console.log('Count result:', countResult);
         const totalPosts = countResult[0].total;
 
         // 게시글 목록 조회
-        const [posts] = await pool.execute(`
+        const [posts] = await pool.query(`
             SELECT 
                 p.id, p.title, p.content, p.view_count, p.created_at, p.updated_at,
                 u.username as author_name
@@ -42,11 +43,11 @@ router.get('/', async (req, res) => {
 
         // 각 게시글의 댓글 수 조회
         for (let post of posts) {
-            const [commentCount] = await pool.execute(
+            const [commentCountResult] = await pool.query(
                 'SELECT COUNT(*) as count FROM comments WHERE post_id = ?',
                 [post.id]
             );
-            post.comment_count = commentCount[0].count;
+            post.comment_count = commentCountResult[0].count;
         }
 
         const totalPages = Math.ceil(totalPosts / limit);
@@ -79,7 +80,7 @@ router.get('/:id', async (req, res) => {
         const postId = req.params.id;
 
         // 게시글 조회
-        const [posts] = await pool.execute(`
+        const [posts] = await pool.query(`
             SELECT 
                 p.id, p.title, p.content, p.view_count, p.created_at, p.updated_at,
                 u.username as author_name, u.id as author_id
@@ -102,7 +103,7 @@ router.get('/:id', async (req, res) => {
         );
 
         // 첨부파일 조회
-        const [attachments] = await pool.execute(
+        const [attachments] = await pool.query(
             'SELECT id, filename, original_name, file_size, mime_type FROM attachments WHERE post_id = ?',
             [postId]
         );

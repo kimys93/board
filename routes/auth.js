@@ -25,7 +25,7 @@ router.post('/register', [
         const { username, email, password } = req.body;
 
         // 중복 사용자 확인
-        const [existingUsers] = await pool.execute(
+        const [existingUsers] = await pool.query(
             'SELECT id FROM users WHERE username = ? OR email = ?',
             [username, email]
         );
@@ -41,7 +41,7 @@ router.post('/register', [
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // 사용자 생성
-        const [result] = await pool.execute(
+        const [result] = await pool.query(
             'INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
             [username, email, hashedPassword]
         );
@@ -78,7 +78,7 @@ router.post('/login', [
         const { username, password } = req.body;
 
         // 사용자 조회
-        const [users] = await pool.execute(
+        const [users] = await pool.query(
             'SELECT id, username, email, password FROM users WHERE username = ? OR email = ?',
             [username, username]
         );
