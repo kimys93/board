@@ -30,11 +30,7 @@ function initializeApp() {
         showHome();
     }
     
-    // 토큰 확인
-    const token = localStorage.getItem('token');
-    if (token) {
-        checkAuth();
-    }
+    // 토큰 확인은 navbar.js에서 처리
 }
 
 // 이벤트 리스너 설정
@@ -196,8 +192,13 @@ async function handleLogin(e) {
         
         localStorage.setItem('token', response.token);
         currentUser = response.user;
-        updateAuthUI();
         showToast('로그인 성공!', 'success');
+        
+        // navbar 새로고침하여 실시간 상태 업데이트
+        if (window.navbarInstance) {
+            window.navbarInstance.checkAuthStatus();
+        }
+        
         showHome();
     } catch (error) {
         showToast(error.message, 'error');
@@ -234,7 +235,6 @@ async function handleRegister(e) {
 function logout() {
     localStorage.removeItem('token');
     currentUser = null;
-    updateAuthUI();
     showToast('로그아웃되었습니다.', 'info');
     showHome();
 }

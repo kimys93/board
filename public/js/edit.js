@@ -51,13 +51,12 @@ async function checkAuth() {
         try {
             const response = await apiRequest('/auth/me');
             currentUser = response.user;
-            updateAuthUI();
         } catch (error) {
             localStorage.removeItem('token');
-            updateAuthUI();
+            window.location.href = '/';
         }
     } else {
-        updateAuthUI();
+        window.location.href = '/';
     }
 }
 
@@ -332,7 +331,6 @@ function showRegister() {
 function logout() {
     localStorage.removeItem('token');
     currentUser = null;
-    updateAuthUI();
     showToast('로그아웃되었습니다.', 'info');
     window.location.href = '/';
 }

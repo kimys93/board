@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>개인 채팅</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+    <style>
+        .chat-container {
+            height: calc(100vh - 120px);
+            display: flex;
+        }
+        
+        .chat-sidebar {
+            width: 350px;
+            border-right: 1px solid #dee2e6;
+            background: #f8f9fa;
+            overflow-y: auto;
+        }
+        
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-header {
+            padding: 1rem;
+            border-bottom: 1px solid #dee2e6;
+            background: white;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+        
+        .chat-input {
+            padding: 1rem;
+            border-top: 1px solid #dee2e6;
+            background: white;
+        }
+        
+        .message-item {
+            margin-bottom: 1rem;
+        }
+        
+        .message-sent {
+            text-align: right;
+        }
+        
+        .message-received {
+            text-align: left;
+        }
+        
+        .message-bubble {
+            display: inline-block;
+            max-width: 70%;
+            padding: 0.75rem 1rem;
+            border-radius: 1rem;
+            word-wrap: break-word;
+        }
+        
+        .message-sent .message-bubble {
+            background: #007bff;
+            color: white;
+        }
+        
+        .message-received .message-bubble {
+            background: white;
+            border: 1px solid #dee2e6;
+        }
+        
+        .message-time {
+            font-size: 0.75rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+        
+        .user-item {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #dee2e6;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .user-item:hover {
+            background: #e9ecef;
+        }
+        
+        .user-item.active {
+            background: #007bff;
+            color: white;
+        }
+        
+        .online-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+        
+        .online-indicator.online {
+            background: #28a745;
+        }
+        
+        .online-indicator.offline {
+            background: #6c757d;
+        }
+        
+        .unread-badge {
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: bold;
+            min-width: 1.5rem;
+            text-align: center;
+            display: inline-block;
+        }
+        
+        .user-item.active .unread-badge {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .search-box {
+            padding: 1rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .no-chat-selected {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #6c757d;
+        }
+        
+        .unread-badge {
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- GNB는 navbar.js에서 동적 생성됩니다 -->
+
+    <div class="container-fluid">
+        <div class="chat-container">
+            <!-- 채팅 사이드바 -->
+            <div class="chat-sidebar">
+                <!-- 사용자 검색 -->
+                <div class="search-box">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="userSearch" placeholder="사용자 검색...">
+                        <button class="btn btn-outline-secondary" type="button" id="searchBtn">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 채팅방 목록 -->
+                <div id="chatRoomsList">
+                    <!-- 채팅방 목록이 여기에 동적으로 로드됩니다 -->
+                </div>
+            </div>
+            
+            <!-- 채팅 메인 영역 -->
+            <div class="chat-main">
+                <div id="noChatSelected" class="no-chat-selected">
+                    <div class="text-center">
+                        <i class="fas fa-comments fa-3x mb-3"></i>
+                        <h5>채팅을 시작하세요</h5>
+                        <p>사용자를 검색하여 개인 채팅을 시작할 수 있습니다.</p>
+                    </div>
+                </div>
+                
+                <!-- 채팅 헤더 (채팅방 선택 시에만 표시) -->
+                <div id="chatHeader" class="chat-header d-none">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            <div class="online-indicator" id="userOnlineStatus"></div>
+                        </div>
+                        <div>
+                            <h6 class="mb-0" id="chatUserName">사용자명</h6>
+                            <small class="text-muted" id="chatUserStatus">상태</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 채팅 메시지 영역 -->
+                <div id="chatMessages" class="chat-messages d-none">
+                    <!-- 메시지들이 여기에 동적으로 로드됩니다 -->
+                </div>
+                
+                <!-- 채팅 입력 영역 -->
+                <div id="chatInput" class="chat-input d-none">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="messageInput" placeholder="메시지를 입력하세요...">
+                        <button class="btn btn-primary" type="button" id="sendBtn">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 사용자 검색 모달 -->
+    <div class="modal fade" id="userSearchModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">사용자 검색</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="modalUserSearch" placeholder="사용자명 또는 ID로 검색...">
+                        <button class="btn btn-outline-secondary" type="button" id="modalSearchBtn">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                    <div id="searchResults">
+                        <!-- 검색 결과가 여기에 표시됩니다 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 공통 스크립트 -->
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/chat.js"></script>
+</body>
+</html>

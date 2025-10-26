@@ -17,7 +17,7 @@ const authenticateToken = async (req, res, next) => {
         
         // 사용자 정보 확인
         const [users] = await pool.execute(
-            'SELECT id, username, email FROM users WHERE id = ?',
+            'SELECT id, user_id, name, email FROM users WHERE id = ?',
             [decoded.userId]
         );
 

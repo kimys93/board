@@ -6,53 +6,10 @@
     <title>회원가입 - 게시판</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="css/style.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
 </head>
 <body>
-    <!-- 네비게이션 -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
-            <a class="navbar-brand" href="/">
-                <i class="fas fa-comments me-2"></i>게시판
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">
-                            <i class="fas fa-home me-1"></i>홈
-                        </a>
-                    </li>
-                </ul>
-                <ul class="navbar-nav" id="authButtons">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/login.html">
-                            <i class="fas fa-sign-in-alt me-1"></i>로그인
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/register.html">
-                            <i class="fas fa-user-plus me-1"></i>회원가입
-                        </a>
-                    </li>
-                </ul>
-                <ul class="navbar-nav d-none" id="userMenu">
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user me-1"></i><span id="userName"></span>
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" onclick="logout()">
-                                <i class="fas fa-sign-out-alt me-1"></i>로그아웃
-                            </a></li>
-                        </ul>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+        <!-- GNB는 navbar.js에서 동적 생성됩니다 -->
 
     <!-- 메인 콘텐츠 -->
     <div class="container mt-4">
@@ -65,12 +22,51 @@
                     <div class="card-body">
                         <form id="registerForm">
                             <div class="mb-3">
-                                <label for="registerUsername" class="form-label">사용자명</label>
-                                <input type="text" class="form-control" id="registerUsername" required>
+                                <label for="registerId" class="form-label">ID</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="registerId" placeholder="ID를 입력해주세요." required>
+                                    <button type="button" class="btn btn-outline-primary" id="checkIdBtn" onclick="checkId()">
+                                        <i class="fas fa-search me-1"></i>중복확인
+                                    </button>
+                                </div>
+                                <div class="invalid-feedback" id="idError"></div>
+                                <div class="valid-feedback" id="idSuccess" style="display: none;">
+                                    <i class="fas fa-check-circle me-1"></i>사용 가능한 ID입니다.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="registerName" class="form-label">이름</label>
+                                <input type="text" class="form-control" id="registerName" placeholder="이름을 입력해주세요." required>
+                                <div class="invalid-feedback" id="nameError"></div>
+                                <div class="valid-feedback" id="nameSuccess" style="display: none;">
+                                    <i class="fas fa-check-circle me-1"></i>올바른 성명입니다.
+                                </div>
                             </div>
                             <div class="mb-3">
                                 <label for="registerEmail" class="form-label">이메일</label>
-                                <input type="email" class="form-control" id="registerEmail" required>
+                                <div class="input-group">
+                                    <input type="email" class="form-control" id="registerEmail" required>
+                                    <button class="btn btn-outline-secondary" type="button" id="checkEmailBtn">
+                                        <i class="fas fa-check me-1"></i>중복 확인
+                                    </button>
+                                </div>
+                                <div class="invalid-feedback" id="emailError"></div>
+                                <div class="valid-feedback" id="emailSuccess" style="display: none;">
+                                    <i class="fas fa-check-circle me-1"></i>사용 가능한 이메일입니다.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="registerGender" class="form-label">성별</label>
+                                <select class="form-select" id="registerGender" required>
+                                    <option value="">성별을 선택해주세요</option>
+                                    <option value="male">남성</option>
+                                    <option value="female">여성</option>
+                                    <option value="other">기타</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="registerPhone" class="form-label">휴대전화 번호</label>
+                                <input type="tel" class="form-control" id="registerPhone" placeholder="휴대전화 번호를 입력해주세요." required>
                             </div>
                             <div class="mb-3">
                                 <label for="registerPassword" class="form-label">비밀번호</label>
@@ -87,7 +83,7 @@
                             </div>
                         </form>
                         <div class="text-center mt-3">
-                            <p>이미 계정이 있으신가요? <a href="/login.html">로그인</a></p>
+                            <p>이미 계정이 있으신가요? <a href="/login">로그인</a></p>
                         </div>
                     </div>
                 </div>
@@ -110,7 +106,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/utils.js"></script>
-    <script src="js/register.js"></script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/register.js"></script>
 </body>
 </html>

@@ -16,41 +16,19 @@ function initializeApp() {
 
 // 이벤트 리스너 설정
 function setupEventListeners() {
-    document.getElementById('loginForm').addEventListener('submit', handleLogin);
-}
-
-// 로그인 처리
-async function handleLogin(e) {
-    e.preventDefault();
-    
-    const username = document.getElementById('loginUsername').value;
-    const password = document.getElementById('loginPassword').value;
-    
-    try {
-        showLoading(true);
-        const response = await apiRequest('/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({ username, password })
+    // 부드러운 스크롤 효과
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
         });
-        
-        localStorage.setItem('token', response.token);
-        currentUser = response.user;
-        
-        // navbar 새로고침하여 실시간 상태 업데이트
-        if (window.navbarInstance) {
-            window.navbarInstance.checkAuthStatus();
-        }
-        
-        showToast('로그인되었습니다.', 'success');
-        setTimeout(() => {
-            window.location.href = '/';
-        }, 1000);
-        
-    } catch (error) {
-        showToast(error.message, 'error');
-    } finally {
-        showLoading(false);
-    }
+    });
 }
 
 // 로그아웃

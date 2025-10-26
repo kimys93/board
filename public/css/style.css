@@ -67,6 +67,14 @@ body {
     color: #6c757d;
 }
 
+.comment-edit-form {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin: 0;
+}
+
 .attachment-item {
     display: inline-block;
     margin: 0.25rem;

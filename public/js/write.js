@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // 앱 초기화
 function initializeApp() {
     checkAuth();
+    setupEventListeners();
 }
 
 // 이벤트 리스너 설정
@@ -41,33 +42,17 @@ function setupEventListeners() {
 // 인증 확인
 async function checkAuth() {
     const token = localStorage.getItem('token');
-    if (token) {
-        try {
-            const response = await apiRequest('/auth/me');
-            currentUser = response.user;
-            updateAuthUI();
-        } catch (error) {
-            localStorage.removeItem('token');
-            updateAuthUI();
-        }
-    } else {
-        updateAuthUI();
-    }
-}
-
-// 인증 UI 업데이트
-function updateAuthUI() {
-    const authButtons = document.getElementById('authButtons');
-    const userMenu = document.getElementById('userMenu');
-
-    if (currentUser) {
-        authButtons.classList.add('d-none');
-        userMenu.classList.remove('d-none');
-        document.getElementById('userName').textContent = currentUser.username;
-    } else {
-        authButtons.classList.remove('d-none');
-        userMenu.classList.add('d-none');
+    if (!token) {
         // 로그인이 필요한 경우 홈으로 리다이렉트
+        window.location.href = '/';
+        return;
+    }
+    
+    try {
+        const response = await apiRequest('/auth/me');
+        currentUser = response.user;
+    } catch (error) {
+        localStorage.removeItem('token');
         window.location.href = '/';
     }
 }
@@ -199,7 +184,6 @@ function goBack() {
 function logout() {
     localStorage.removeItem('token');
     currentUser = null;
-    updateAuthUI();
     showToast('로그아웃되었습니다.', 'info');
     window.location.href = '/';
 }

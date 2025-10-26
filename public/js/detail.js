@@ -32,28 +32,12 @@ async function checkAuth() {
         try {
             const response = await apiRequest('/auth/me');
             currentUser = response.user;
-            updateAuthUI();
         } catch (error) {
             localStorage.removeItem('token');
-            updateAuthUI();
+            currentUser = null;
         }
     } else {
-        updateAuthUI();
-    }
-}
-
-// 인증 UI 업데이트
-function updateAuthUI() {
-    const authButtons = document.getElementById('authButtons');
-    const userMenu = document.getElementById('userMenu');
-
-    if (currentUser) {
-        authButtons.classList.add('d-none');
-        userMenu.classList.remove('d-none');
-        document.getElementById('userName').textContent = currentUser.username;
-    } else {
-        authButtons.classList.remove('d-none');
-        userMenu.classList.add('d-none');
+        currentUser = null;
     }
 }
 
@@ -192,7 +176,7 @@ function displayComments(comments) {
                         </div>
                     </div>
                     <div class="comment-content bg-white p-3 rounded border-start border-3 border-primary">
-                        ${escapeHtml(comment.content)}
+                        ${escapeHtml(comment.content).replace(/\n/g, '<br>')}
                     </div>
                 </div>
                 ${currentUser && currentUser.id === comment.author_id ? `
@@ -235,25 +219,33 @@ async function deletePost(postId) {
 
 // 댓글 수정
 function editComment(commentId) {
+    console.log('editComment 함수 호출됨:', commentId);
+    
     const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
     if (!commentElement) return;
     
     const contentElement = commentElement.querySelector('.comment-content');
-    const currentContent = contentElement.textContent;
+    if (!contentElement) return;
     
-    // 수정 폼으로 변경
+    const currentContent = contentElement.innerHTML.trim();
+    
+    // 원래 내용을 데이터 속성으로 저장
+    contentElement.setAttribute('data-original-content', currentContent);
+    
+    // 댓글 내용을 간단한 수정 폼으로 교체
+    // <br> 태그를 줄바꿈으로 변환
+    const textareaContent = currentContent.replace(/<br\s*\/?>/gi, '\n');
+    
     contentElement.innerHTML = `
-        <div class="bg-white p-3 rounded border-start border-3 border-warning">
-            <div class="d-flex gap-2">
-                <textarea class="form-control" id="editCommentContent" rows="3" placeholder="댓글을 수정해주세요...">${currentContent}</textarea>
-                <div class="d-flex flex-column gap-2">
-                    <button class="btn btn-sm btn-success" onclick="saveCommentEdit(${commentId})" title="저장">
-                        <i class="fas fa-check"></i>
-                    </button>
-                    <button class="btn btn-sm btn-secondary" onclick="cancelCommentEdit(${commentId}, '${currentContent}')" title="취소">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
+        <div class="p-3" style="background: #f8f9fa; border-radius: 0.5rem; margin: 0; padding: 1rem;">
+            <textarea class="form-control mb-2" id="editCommentContent" rows="3" placeholder="댓글을 수정해주세요...">${textareaContent}</textarea>
+            <div class="text-end">
+                <button class="btn btn-sm btn-success me-2" onclick="saveCommentEdit(${commentId})">
+                    <i class="fas fa-check me-1"></i>저장
+                </button>
+                <button class="btn btn-sm btn-secondary" onclick="cancelCommentEdit(${commentId})">
+                    <i class="fas fa-times me-1"></i>취소
+                </button>
             </div>
         </div>
     `;
@@ -283,13 +275,16 @@ async function saveCommentEdit(commentId) {
 }
 
 // 댓글 수정 취소
-function cancelCommentEdit(commentId, originalContent) {
+function cancelCommentEdit(commentId) {
     const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
     if (commentElement) {
         const contentElement = commentElement.querySelector('.comment-content');
+        // 저장된 원래 내용을 가져와서 표시
+        const originalContent = contentElement.getAttribute('data-original-content');
         contentElement.innerHTML = originalContent;
     }
 }
+
 
 // 댓글 삭제
 async function deleteComment(commentId) {
@@ -322,7 +317,6 @@ function showRegister() {
 function logout() {
     localStorage.removeItem('token');
     currentUser = null;
-    updateAuthUI();
     showToast('로그아웃되었습니다.', 'info');
     window.location.href = '/';
 }
@@ -348,8 +342,13 @@ async function handleCommentSubmit(event) {
     event.preventDefault();
     
     if (!currentUser) {
-        showToast('로그인이 필요합니다.', 'error');
-        showLogin();
+        // 로그인 유도 모달 표시
+        if (typeof showLoginModal === 'function') {
+            showLoginModal('댓글 작성');
+        } else {
+            showToast('로그인이 필요합니다.', 'error');
+            showLogin();
+        }
         return;
     }
     

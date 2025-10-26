@@ -33,7 +33,7 @@ router.get('/', async (req, res) => {
         const [posts] = await pool.query(`
             SELECT 
                 p.id, p.title, p.content, p.view_count, p.created_at, p.updated_at,
-                u.username as author_name
+                u.user_id as author_name
             FROM posts p 
             JOIN users u ON p.author_id = u.id 
             ${whereClause}
@@ -83,7 +83,7 @@ router.get('/:id', async (req, res) => {
         const [posts] = await pool.query(`
             SELECT 
                 p.id, p.title, p.content, p.view_count, p.created_at, p.updated_at,
-                u.username as author_name, u.id as author_id
+                u.user_id as author_name, u.id as author_id
             FROM posts p 
             JOIN users u ON p.author_id = u.id 
             WHERE p.id = ?
