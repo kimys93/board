@@ -15,6 +15,8 @@ class NavBar {
         if (this.user) {
             this.updateOnlineStatus(true);
             this.setupWebSocket();
+            // 알림 상태 확인
+            await this.checkNotificationStatus();
         }
     }
 
@@ -86,9 +88,12 @@ class NavBar {
 
             if (response.ok) {
                 const data = await response.json();
+                console.log('📊 미읽은 알림 수:', data.unreadCount);
                 this.updateNotificationBadge(data.unreadCount);
-        }
-    } catch (error) {
+            } else {
+                console.error('알림 상태 조회 실패:', response.status);
+            }
+        } catch (error) {
             console.error('알림 상태 확인 실패:', error);
         }
     }
@@ -98,15 +103,21 @@ class NavBar {
         const badge = document.getElementById('notificationBadge');
         const icon = document.getElementById('notificationIcon');
         
+        console.log('🔔 알림 배지 업데이트:', count, 'badge:', badge, 'icon:', icon);
+        
         if (badge && icon) {
             if (count > 0) {
                 badge.textContent = count > 99 ? '99+' : count;
                 badge.classList.remove('d-none');
                 icon.classList.add('text-warning'); // 알림이 있을 때 노란색
+                console.log('✅ 알림 배지 표시:', count);
             } else {
                 badge.classList.add('d-none');
                 icon.classList.remove('text-warning');
+                console.log('❌ 알림 배지 숨김');
             }
+        } else {
+            console.warn('⚠️ 알림 배지 또는 아이콘을 찾을 수 없습니다.');
         }
     }
 
@@ -162,6 +173,11 @@ class NavBar {
                         // 사용자 상태 변경 처리
                         this.handleUserStatusChange(message);
                         break;
+                    case 'notification':
+                        console.log('📬 알림 수신:', message.notification);
+                        // 알림 처리
+                        this.handleNotification(message.notification);
+                        break;
                     case 'auth_success':
                         console.log('✅ NavBar WebSocket 인증 성공');
                         break;
@@ -205,6 +221,72 @@ class NavBar {
         // 전역 상태 변경 이벤트 발생
         window.dispatchEvent(new CustomEvent('userStatusChange', {
             detail: { userId, isOnline }
+        }));
+    }
+
+    // 알림 처리
+    async handleNotification(notification) {
+        console.log('📬 알림 처리 시작:', notification);
+        
+        // 알림 타입에 따른 설정 확인
+        try {
+            const response = await fetch('/api/notifications/settings', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const settings = data.settings;
+                
+                // 알림 타입에 따라 설정 확인
+                let isNotificationEnabled = true;
+                if (notification.type === 'message') {
+                    // 채팅 알림 설정 확인
+                    const chatNotification = settings.chat_notification;
+                    isNotificationEnabled = chatNotification === 1 || chatNotification === true || chatNotification === '1';
+                } else if (notification.type === 'comment') {
+                    // 댓글 알림 설정 확인
+                    const commentNotification = settings.comment_notification;
+                    isNotificationEnabled = commentNotification === 1 || commentNotification === true || commentNotification === '1';
+                }
+                
+                if (!isNotificationEnabled) {
+                    console.log(`🔕 알림 설정 OFF: ${notification.type} 알림 및 배지 업데이트 건너뜀`);
+                    // OFF 상태에서는 배지도 업데이트하지 않음
+                    return;
+                }
+            } else {
+                console.warn('알림 설정 조회 실패:', response.status);
+            }
+        } catch (error) {
+            console.error('알림 설정 확인 실패:', error);
+            // 에러 발생 시에도 알림 표시 (기본 동작)
+        }
+        
+        // 알림 배지 업데이트
+        await this.checkNotificationStatus();
+        
+        // 브라우저 알림 표시
+        if (Notification.permission === 'granted') {
+            new Notification(notification.title, {
+                body: notification.message
+            });
+        } else if (Notification.permission !== 'denied') {
+            // 알림 권한 요청
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    new Notification(notification.title, {
+                        body: notification.message
+                    });
+                }
+            });
+        }
+        
+        // 전역 알림 이벤트 발생
+        window.dispatchEvent(new CustomEvent('newNotification', {
+            detail: notification
         }));
     }
 

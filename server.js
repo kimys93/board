@@ -336,6 +336,26 @@ function broadcastUserStatusChange(userId, isOnline) {
     console.log(`📤 상태 변경 브로드캐스트 완료: ${sentCount}개 클라이언트에게 전송`);
 }
 
+// 특정 사용자에게 알림 브로드캐스트
+function broadcastNotification(targetUserId, notification) {
+    console.log(`📬 알림 브로드캐스트: userId ${targetUserId}`);
+    
+    const message = JSON.stringify({
+        type: 'notification',
+        notification: notification
+    });
+    
+    let sentCount = 0;
+    clients.forEach((clientInfo, ws) => {
+        if (ws.readyState === WebSocket.OPEN && clientInfo.userId === targetUserId) {
+            ws.send(message);
+            sentCount++;
+        }
+    });
+    
+    console.log(`📤 알림 브로드캐스트 완료: ${sentCount}개 클라이언트에게 전송`);
+}
+
 // 메시지를 데이터베이스에 저장
 async function saveMessage(messageData) {
     try {
@@ -351,6 +371,7 @@ async function saveMessage(messageData) {
 
 // 앱에 브로드캐스트 함수 등록
 app.set('broadcastUserStatusChange', broadcastUserStatusChange);
+app.set('broadcastNotification', broadcastNotification);
 
 server.listen(PORT, () => {
     console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);

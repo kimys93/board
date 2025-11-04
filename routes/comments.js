@@ -29,6 +29,84 @@ router.post('/', authenticateToken, [
             [post_id, author_id, content]
         );
 
+        // 게시글 작성자에게 알림 생성 (브라우저 알림)
+        try {
+            // 게시글 작성자 정보 가져오기
+            const [postInfo] = await pool.query(
+                'SELECT author_id, title FROM posts WHERE id = ?',
+                [post_id]
+            );
+
+            if (postInfo.length > 0) {
+                const postAuthorId = postInfo[0].author_id;
+                const postTitle = postInfo[0].title;
+                
+                // 본인 게시글에 댓글을 달면 알림 생성하지 않음
+                if (postAuthorId !== author_id) {
+                    // 댓글 알림 설정 확인
+                    const [settings] = await pool.query(
+                        'SELECT comment_notification FROM notification_settings WHERE user_id = ?',
+                        [postAuthorId]
+                    );
+
+                    let shouldNotify = true;
+                    if (settings.length > 0) {
+                        // comment_notification이 1이거나 true인 경우에만 알림 발송
+                        const commentNotification = settings[0].comment_notification;
+                        shouldNotify = commentNotification === 1 || commentNotification === true || commentNotification === '1';
+                        console.log(`💬 댓글 알림 설정 확인: userId ${postAuthorId}, comment_notification=${commentNotification}, shouldNotify=${shouldNotify}`);
+                    } else {
+                        // 기본 설정 생성
+                        await pool.query(
+                            `INSERT INTO notification_settings 
+                             (user_id, browser_notification, chat_notification, comment_notification) 
+                             VALUES (?, 1, 1, 1)`,
+                            [postAuthorId]
+                        );
+                    }
+
+                    if (shouldNotify) {
+                        // 댓글 작성자 정보 가져오기
+                        const [commentAuthor] = await pool.query(
+                            'SELECT name, user_id FROM users WHERE id = ?',
+                            [author_id]
+                        );
+
+                        if (commentAuthor.length > 0) {
+                            const notificationMessage = `${commentAuthor[0].name || commentAuthor[0].user_id}님이 "${postTitle}" 게시글에 댓글을 남겼습니다.`;
+                            const notificationData = {
+                                message: notificationMessage,
+                                postId: parseInt(post_id),
+                                commentId: result.insertId,
+                                authorName: commentAuthor[0].name || commentAuthor[0].user_id
+                            };
+
+                            // 알림 생성
+                            await pool.query(
+                                'INSERT INTO notifications (user_id, title, message, type, read_status) VALUES (?, ?, ?, ?, 0)',
+                                [postAuthorId, '새 댓글', JSON.stringify(notificationData), 'comment']
+                            );
+
+                            // WebSocket으로 실시간 알림 전달
+                            const broadcastNotification = req.app.get('broadcastNotification');
+                            if (broadcastNotification) {
+                                broadcastNotification(postAuthorId, {
+                                    title: '새 댓글',
+                                    message: notificationMessage,
+                                    type: 'comment',
+                                    postId: parseInt(post_id),
+                                    commentId: result.insertId
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('댓글 알림 생성 오류:', error);
+            // 알림 생성 실패해도 댓글 작성은 성공으로 처리
+        }
+
         res.status(201).json({
             success: true,
             message: '댓글이 작성되었습니다.',
@@ -186,6 +264,84 @@ router.post('/:postId', authenticateToken, [
             'INSERT INTO comments (post_id, author_id, content) VALUES (?, ?, ?)',
             [postId, authorId, content]
         );
+
+        // 게시글 작성자에게 알림 생성 (브라우저 알림)
+        try {
+            // 게시글 작성자 정보 가져오기
+            const [postInfo] = await pool.query(
+                'SELECT author_id, title FROM posts WHERE id = ?',
+                [postId]
+            );
+
+            if (postInfo.length > 0) {
+                const postAuthorId = postInfo[0].author_id;
+                const postTitle = postInfo[0].title;
+                
+                // 본인 게시글에 댓글을 달면 알림 생성하지 않음
+                if (postAuthorId !== authorId) {
+                    // 댓글 알림 설정 확인
+                    const [settings] = await pool.query(
+                        'SELECT comment_notification FROM notification_settings WHERE user_id = ?',
+                        [postAuthorId]
+                    );
+
+                    let shouldNotify = true;
+                    if (settings.length > 0) {
+                        // comment_notification이 1이거나 true인 경우에만 알림 발송
+                        const commentNotification = settings[0].comment_notification;
+                        shouldNotify = commentNotification === 1 || commentNotification === true || commentNotification === '1';
+                        console.log(`💬 댓글 알림 설정 확인: userId ${postAuthorId}, comment_notification=${commentNotification}, shouldNotify=${shouldNotify}`);
+                    } else {
+                        // 기본 설정 생성
+                        await pool.query(
+                            `INSERT INTO notification_settings 
+                             (user_id, browser_notification, chat_notification, comment_notification) 
+                             VALUES (?, 1, 1, 1)`,
+                            [postAuthorId]
+                        );
+                    }
+
+                    if (shouldNotify) {
+                        // 댓글 작성자 정보 가져오기
+                        const [commentAuthor] = await pool.query(
+                            'SELECT name, user_id FROM users WHERE id = ?',
+                            [authorId]
+                        );
+
+                        if (commentAuthor.length > 0) {
+                            const notificationMessage = `${commentAuthor[0].name || commentAuthor[0].user_id}님이 "${postTitle}" 게시글에 댓글을 남겼습니다.`;
+                            const notificationData = {
+                                message: notificationMessage,
+                                postId: parseInt(postId),
+                                commentId: result.insertId,
+                                authorName: commentAuthor[0].name || commentAuthor[0].user_id
+                            };
+
+                            // 알림 생성
+                            await pool.query(
+                                'INSERT INTO notifications (user_id, title, message, type, read_status) VALUES (?, ?, ?, ?, 0)',
+                                [postAuthorId, '새 댓글', JSON.stringify(notificationData), 'comment']
+                            );
+
+                            // WebSocket으로 실시간 알림 전달
+                            const broadcastNotification = req.app.get('broadcastNotification');
+                            if (broadcastNotification) {
+                                broadcastNotification(postAuthorId, {
+                                    title: '새 댓글',
+                                    message: notificationMessage,
+                                    type: 'comment',
+                                    postId: parseInt(postId),
+                                    commentId: result.insertId
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('댓글 알림 생성 오류:', error);
+            // 알림 생성 실패해도 댓글 작성은 성공으로 처리
+        }
 
         res.status(201).json({
             success: true,

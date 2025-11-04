@@ -205,9 +205,9 @@ router.post('/message', auth.authenticateToken, async (req, res) => {
             });
         }
 
-        // 채팅방 접근 권한 확인
+        // 채팅방 접근 권한 확인 및 상대방 찾기
         const [rooms] = await pool.query(
-            'SELECT id FROM chat_rooms WHERE id = ? AND (user1_id = ? OR user2_id = ?)',
+            'SELECT id, user1_id, user2_id FROM chat_rooms WHERE id = ? AND (user1_id = ? OR user2_id = ?)',
             [roomId, currentUserId, currentUserId]
         );
 
@@ -218,10 +218,13 @@ router.post('/message', auth.authenticateToken, async (req, res) => {
             });
         }
 
-        // 메시지 저장
+        const room = rooms[0];
+        const otherUserId = room.user1_id === currentUserId ? room.user2_id : room.user1_id;
+
+        // 메시지 저장 (기존 테이블 구조 사용)
         const [result] = await pool.query(
-            'INSERT INTO chat_messages (user_id, username, content) VALUES (?, ?, ?)',
-            [currentUserId, req.user.name || req.user.user_id, message.trim()]
+            'INSERT INTO chat_messages (user_id, username, content, message_type) VALUES (?, ?, ?, ?)',
+            [currentUserId, req.user.name || req.user.user_id, message.trim(), 'text']
         );
 
         // 채팅방 업데이트 시간 갱신
@@ -229,6 +232,75 @@ router.post('/message', auth.authenticateToken, async (req, res) => {
             'UPDATE chat_rooms SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
             [roomId]
         );
+
+        // 상대방에게 알림 생성 (알림 설정 확인)
+        try {
+            const [settings] = await pool.query(
+                'SELECT chat_notification FROM notification_settings WHERE user_id = ?',
+                [otherUserId]
+            );
+
+            // 알림 설정이 없으면 기본값으로 생성하고 알림 발송
+            let shouldNotify = true;
+            if (settings.length > 0) {
+                // chat_notification이 1이거나 true인 경우에만 알림 발송
+                const chatNotification = settings[0].chat_notification;
+                shouldNotify = chatNotification === 1 || chatNotification === true || chatNotification === '1';
+                console.log(`🔔 채팅 알림 설정 확인: userId ${otherUserId}, chat_notification=${chatNotification}, shouldNotify=${shouldNotify}`);
+            } else {
+                // 기본 설정 생성
+                await pool.query(
+                    `INSERT INTO notification_settings 
+                     (user_id, browser_notification, chat_notification, comment_notification) 
+                     VALUES (?, 1, 1, 1)`,
+                    [otherUserId]
+                );
+            }
+
+            // 알림 설정이 ON인 경우에만 알림 생성 및 전송
+            if (shouldNotify) {
+                // 상대방 사용자 정보 가져오기
+                const [otherUser] = await pool.query(
+                    'SELECT name FROM users WHERE id = ?',
+                    [otherUserId]
+                );
+
+                if (otherUser.length > 0) {
+                    // 알림 메시지에 room_id 포함 (채팅방 이동을 위해)
+                    const notificationMessage = `${req.user.name || req.user.user_id}: ${message.trim().substring(0, 50)}${message.trim().length > 50 ? '...' : ''}`;
+                    const notificationData = {
+                        message: notificationMessage,
+                        roomId: roomId,
+                        senderId: currentUserId,
+                        senderName: req.user.name || req.user.user_id
+                    };
+
+                    // 알림 생성 (message에 JSON 데이터 포함)
+                    await pool.query(
+                        'INSERT INTO notifications (user_id, title, message, type, read_status) VALUES (?, ?, ?, ?, 0)',
+                        [otherUserId, `새 메시지`, JSON.stringify(notificationData), 'message']
+                    );
+
+                    // WebSocket으로 실시간 알림 전달
+                    const broadcastNotification = req.app.get('broadcastNotification');
+                    if (broadcastNotification) {
+                        broadcastNotification(otherUserId, {
+                            title: '새 메시지',
+                            message: notificationMessage,
+                            type: 'message',
+                            roomId: roomId,
+                            senderId: currentUserId,
+                            senderName: req.user.name || req.user.user_id
+                        });
+                    }
+                }
+            } else {
+                console.log(`🔕 알림 설정 OFF: userId ${otherUserId}에게 알림 전송하지 않음`);
+            }
+        } catch (error) {
+            console.error('알림 생성 오류:', error);
+            // 알림 생성 실패해도 메시지 전송은 성공으로 처리
+        }
 
         res.json({
             success: true,

@@ -29,8 +29,21 @@ function setupEventListeners() {
     
     // 검색 버튼
     document.getElementById('searchBtn').addEventListener('click', function() {
-        const searchTerm = document.getElementById('searchInput').value.trim();
-        if (searchTerm) {
+        const searchInput = document.getElementById('searchInput');
+        const originalValue = searchInput.value;
+        const searchTerm = originalValue.trim();
+        
+        // 원본 값이 비어있으면 전체 게시글 표시, 공백만 있으면 무시
+        if (originalValue === '') {
+            // 진짜 빈 값일 때만 전체 게시글 표시
+            searchInput.value = '';
+            loadPosts(1);
+        } else if (searchTerm === '') {
+            // 공백만 입력된 경우 검색하지 않음 (현재 상태 유지)
+            searchInput.value = '';
+            return;
+        } else {
+            // 검색어가 있을 때만 검색 실행
             searchPosts(searchTerm);
         }
     });
@@ -38,8 +51,20 @@ function setupEventListeners() {
     // 검색 입력 엔터키
     document.getElementById('searchInput').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
-            const searchTerm = this.value.trim();
-            if (searchTerm) {
+            const originalValue = this.value;
+            const searchTerm = originalValue.trim();
+            
+            // 원본 값이 비어있으면 전체 게시글 표시, 공백만 있으면 무시
+            if (originalValue === '') {
+                // 진짜 빈 값일 때만 전체 게시글 표시
+                this.value = '';
+                loadPosts(1);
+            } else if (searchTerm === '') {
+                // 공백만 입력된 경우 검색하지 않음 (현재 상태 유지)
+                this.value = '';
+                return;
+            } else {
+                // 검색어가 있을 때만 검색 실행
                 searchPosts(searchTerm);
             }
         }
@@ -84,7 +109,18 @@ async function searchPosts(searchTerm) {
     try {
         showLoading(true);
         
-        const response = await fetch(`/api/posts?search=${encodeURIComponent(searchTerm)}`);
+        // 검색어가 비어있으면 검색하지 않음
+        if (!searchTerm || searchTerm.trim() === '') {
+            showLoading(false);
+            return;
+        }
+        
+        const searchType = document.getElementById('searchType')?.value || 'title';
+        const params = new URLSearchParams();
+        params.append('search', searchTerm.trim());
+        params.append('searchType', searchType);
+        
+        const response = await fetch(`/api/posts?${params}`);
         const data = await response.json();
         
         if (data.success) {

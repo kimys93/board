@@ -132,107 +132,31 @@
                     </div>
                     <div class="card-body">
                         <form id="notificationSettingsForm">
-                            <!-- 이메일 알림 -->
+                            <!-- 알림 종류 -->
                             <div class="settings-section">
-                                <h6><i class="fas fa-envelope me-2"></i>이메일 알림</h6>
+                                <h6><i class="fas fa-bell me-2"></i>알림 종류</h6>
                                 <div class="mb-3">
-                                    <label class="form-label">새 댓글 알림</label>
+                                    <label class="form-label">채팅 메시지 알림</label>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span>채팅 메시지 받을 때</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="chatNotification" checked>
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">댓글 알림</label>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <span>내 게시글에 댓글이 달렸을 때</span>
                                         <label class="toggle-switch">
-                                            <input type="checkbox" id="emailCommentNotification" checked>
+                                            <input type="checkbox" id="commentNotification" checked>
                                             <span class="slider"></span>
                                         </label>
                                     </div>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label">새 메시지 알림</label>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <span>채팅에서 새 메시지가 올 때</span>
-                                        <label class="toggle-switch">
-                                            <input type="checkbox" id="emailMessageNotification" checked>
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">시스템 알림</label>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <span>중요한 시스템 업데이트</span>
-                                        <label class="toggle-switch">
-                                            <input type="checkbox" id="emailSystemNotification" checked>
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- 브라우저 알림 -->
-                            <div class="settings-section">
-                                <h6><i class="fas fa-browser me-2"></i>브라우저 알림</h6>
-                                <div class="mb-3">
-                                    <label class="form-label">실시간 알림</label>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <span>브라우저 푸시 알림</span>
-                                        <label class="toggle-switch">
-                                            <input type="checkbox" id="browserNotification" checked>
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">소리 알림</label>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <span>알림 소리 재생</span>
-                                        <label class="toggle-switch">
-                                            <input type="checkbox" id="soundNotification" checked>
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- SMS 알림 (모의) -->
-                            <div class="settings-section">
-                                <h6><i class="fas fa-sms me-2"></i>SMS 알림</h6>
-                                <div class="mb-3">
-                                    <label class="form-label">긴급 알림</label>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <span>중요한 알림만 SMS로</span>
-                                        <label class="toggle-switch">
-                                            <input type="checkbox" id="smsNotification">
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="d-grid">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save me-1"></i>설정 저장
-                                </button>
                             </div>
                         </form>
-                    </div>
-                </div>
-
-                <!-- 알림 테스트 -->
-                <div class="card mt-3">
-                    <div class="card-header">
-                        <h6 class="mb-0"><i class="fas fa-flask me-2"></i>알림 테스트</h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="d-grid gap-2">
-                            <button class="btn btn-outline-primary" onclick="testBrowserNotification()">
-                                <i class="fas fa-bell me-1"></i>브라우저 알림 테스트
-                            </button>
-                            <button class="btn btn-outline-success" onclick="testEmailNotification()">
-                                <i class="fas fa-envelope me-1"></i>이메일 알림 테스트
-                            </button>
-                            <button class="btn btn-outline-warning" onclick="testSmsNotification()">
-                                <i class="fas fa-sms me-1"></i>SMS 알림 테스트
-                            </button>
-                        </div>
                     </div>
                 </div>
             </div>

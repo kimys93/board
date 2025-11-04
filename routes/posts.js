@@ -12,34 +12,93 @@ router.get('/', async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
         const search = req.query.search || '';
+        const searchType = req.query.searchType || 'title'; // title, content, author
 
         let whereClause = '';
         let queryParams = [];
 
         if (search) {
-            whereClause = 'WHERE p.title LIKE ? OR p.content LIKE ?';
-            queryParams = [`%${search}%`, `%${search}%`];
+            switch (searchType) {
+                case 'title':
+                    // 제목만 검색
+                    whereClause = 'WHERE p.title LIKE ?';
+                    queryParams = [`%${search}%`];
+                    break;
+                case 'content':
+                    // 내용만 검색
+                    whereClause = 'WHERE p.content LIKE ?';
+                    queryParams = [`%${search}%`];
+                    break;
+                case 'author':
+                    // 작성자만 검색
+                    whereClause = 'WHERE u.user_id LIKE ?';
+                    queryParams = [`%${search}%`];
+                    break;
+                default:
+                    // 기본값: 제목 검색
+                    whereClause = 'WHERE p.title LIKE ?';
+                    queryParams = [`%${search}%`];
+                    break;
+            }
         }
 
-        // 전체 게시글 수 조회
-        const [countResult] = await pool.execute(
-            `SELECT COUNT(*) as total FROM posts p ${whereClause}`,
-            queryParams
-        );
+        // 전체 게시글 수 조회 (작성자 검색인 경우만 JOIN 필요)
+        let countQuery = '';
+        if (whereClause.includes('u.user_id')) {
+            // 작성자 검색인 경우 JOIN 필요
+            countQuery = `SELECT COUNT(*) as total FROM posts p JOIN users u ON p.author_id = u.id ${whereClause}`;
+        } else if (whereClause) {
+            // 제목이나 내용 검색하는 경우 JOIN 불필요
+            countQuery = `SELECT COUNT(*) as total FROM posts p ${whereClause}`;
+        } else {
+            // 검색어가 없는 경우
+            countQuery = `SELECT COUNT(*) as total FROM posts p`;
+        }
+        
+        const [countResult] = await pool.execute(countQuery, queryParams);
         console.log('Count result:', countResult);
         const totalPosts = countResult[0].total;
 
-        // 게시글 목록 조회
-        const [posts] = await pool.query(`
-            SELECT 
-                p.id, p.title, p.content, p.view_count, p.created_at, p.updated_at,
-                u.user_id as author_name
-            FROM posts p 
-            JOIN users u ON p.author_id = u.id 
-            ${whereClause}
-            ORDER BY p.created_at DESC 
-            LIMIT ? OFFSET ?
-        `, [...queryParams, limit, offset]);
+        // 게시글 목록 조회 (작성자 정보 표시를 위해 항상 JOIN 필요)
+        let postsQuery = '';
+        if (whereClause.includes('u.user_id')) {
+            // 작성자 검색인 경우 JOIN 포함된 whereClause 사용
+            postsQuery = `
+                SELECT 
+                    p.id, p.title, p.content, p.view_count, p.created_at, p.updated_at,
+                    u.user_id as author_name
+                FROM posts p 
+                JOIN users u ON p.author_id = u.id 
+                ${whereClause}
+                ORDER BY p.created_at DESC 
+                LIMIT ? OFFSET ?
+            `;
+        } else if (whereClause) {
+            // 제목이나 내용 검색하는 경우 JOIN 필요 (작성자 정보 표시를 위해)
+            postsQuery = `
+                SELECT 
+                    p.id, p.title, p.content, p.view_count, p.created_at, p.updated_at,
+                    u.user_id as author_name
+                FROM posts p 
+                JOIN users u ON p.author_id = u.id 
+                ${whereClause}
+                ORDER BY p.created_at DESC 
+                LIMIT ? OFFSET ?
+            `;
+        } else {
+            // 검색어가 없는 경우
+            postsQuery = `
+                SELECT 
+                    p.id, p.title, p.content, p.view_count, p.created_at, p.updated_at,
+                    u.user_id as author_name
+                FROM posts p 
+                JOIN users u ON p.author_id = u.id 
+                ORDER BY p.created_at DESC 
+                LIMIT ? OFFSET ?
+            `;
+        }
+        
+        const [posts] = await pool.query(postsQuery, [...queryParams, limit, offset]);
 
         // 각 게시글의 댓글 수 조회
         for (let post of posts) {

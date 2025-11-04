@@ -17,6 +17,27 @@ async function initializeApp() {
     loadChatRooms();
     updateOnlineStatus(true);
     setupWebSocket();
+    
+    // URL 파라미터에서 roomId 확인 (알림 클릭으로 이동한 경우)
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('roomId');
+    if (roomId) {
+        // 채팅방 목록 로드 후 해당 채팅방 선택
+        setTimeout(() => {
+            const room = chatRooms.find(r => r.room_id === parseInt(roomId));
+            if (room) {
+                selectChatRoom(
+                    room.room_id,
+                    room.other_user_id,
+                    room.other_user_name,
+                    room.other_user_user_id,
+                    room.other_user_online
+                );
+            }
+            // URL에서 roomId 제거
+            window.history.replaceState({}, '', '/chat');
+        }, 500);
+    }
 }
 
 // 인증 확인

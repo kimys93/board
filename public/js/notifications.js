@@ -37,8 +37,20 @@ async function checkAuth() {
 
 // 이벤트 리스너 설정
 function setupEventListeners() {
-    // 알림 설정 폼
-    document.getElementById('notificationSettingsForm').addEventListener('submit', handleSettingsSave);
+    // 각 토글 버튼에 실시간 변경 이벤트 추가
+    const toggleIds = [
+        'chatNotification',
+        'commentNotification'
+    ];
+    
+    toggleIds.forEach(id => {
+        const toggle = document.getElementById(id);
+        if (toggle) {
+            toggle.addEventListener('change', async function() {
+                await saveNotificationSetting(id, this.checked);
+            });
+        }
+    });
 }
 
 // 알림 목록 로드
@@ -80,28 +92,49 @@ function displayNotifications(notifications) {
 
     notifications.forEach(notification => {
         const notificationElement = document.createElement('div');
-        notificationElement.className = `notification-item ${notification.read ? 'read' : 'unread'}`;
+        notificationElement.className = `notification-item ${notification.is_read ? 'read' : 'unread'} ${(notification.type === 'message' || notification.type === 'comment') ? 'clickable' : ''}`;
+        
+        // 메시지 알림인 경우 JSON 파싱
+        let displayMessage = notification.message;
+        let notificationData = null;
+        if (notification.type === 'message' || notification.type === 'comment') {
+            try {
+                notificationData = JSON.parse(notification.message);
+                displayMessage = notificationData.message || notification.message;
+            } catch (e) {
+                // JSON 파싱 실패 시 원본 메시지 사용
+                displayMessage = notification.message;
+            }
+        }
         
         const time = new Date(notification.created_at).toLocaleString('ko-KR');
         
+        // 알림 타입에 따른 클릭 핸들러 설정
+        let clickHandler = '';
+        if (notification.type === 'message' && notificationData) {
+            clickHandler = `onclick="openChatFromNotification(${parseInt(notification.id)}, ${parseInt(notificationData.roomId)}, ${parseInt(notificationData.senderId)}, '${String(notificationData.senderName).replace(/'/g, "\\'")}')" style="cursor: pointer;"`;
+        } else if (notification.type === 'comment' && notificationData) {
+            clickHandler = `onclick="openPostFromNotification(${parseInt(notification.id)}, ${parseInt(notificationData.postId)})" style="cursor: pointer;"`;
+        }
+        
         notificationElement.innerHTML = `
-            <div class="d-flex justify-content-between align-items-start">
+            <div class="d-flex justify-content-between align-items-start" ${clickHandler} style="${clickHandler ? 'cursor: pointer;' : ''}">
                 <div class="flex-grow-1">
                     <div class="d-flex align-items-center mb-1">
                         <i class="fas fa-${getNotificationIcon(notification.type)} me-2 text-${getNotificationColor(notification.type)}"></i>
                         <strong>${notification.title}</strong>
-                        ${!notification.read ? '<span class="badge bg-danger ms-2">NEW</span>' : ''}
+                        ${!notification.is_read ? '<span class="badge bg-danger ms-2">NEW</span>' : ''}
                     </div>
-                    <p class="mb-1">${notification.message}</p>
+                    <p class="mb-1">${displayMessage}</p>
                     <small class="notification-time">${time}</small>
                 </div>
-                <div class="dropdown">
+                <div class="dropdown" onclick="event.stopPropagation()">
                     <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown">
                         <i class="fas fa-ellipsis-v"></i>
                     </button>
                     <ul class="dropdown-menu">
-                        ${!notification.read ? '<li><a class="dropdown-item" href="#" onclick="markAsRead(' + notification.id + ')"><i class="fas fa-check me-1"></i>읽음</a></li>' : ''}
-                        <li><a class="dropdown-item text-danger" href="#" onclick="deleteNotification(' + notification.id + ')"><i class="fas fa-trash me-1"></i>삭제</a></li>
+                        ${!notification.is_read ? `<li><a class="dropdown-item" href="#" onclick="markAsRead(${notification.id})"><i class="fas fa-check me-1"></i>읽음</a></li>` : ''}
+                        <li><a class="dropdown-item text-danger" href="#" onclick="deleteNotification(${notification.id})"><i class="fas fa-trash me-1"></i>삭제</a></li>
                     </ul>
                 </div>
             </div>
@@ -137,25 +170,66 @@ function getNotificationColor(type) {
 
 // 알림 설정 폼 업데이트
 function updateSettingsForm() {
-    document.getElementById('emailCommentNotification').checked = notificationSettings.email_comment || false;
-    document.getElementById('emailMessageNotification').checked = notificationSettings.email_message || false;
-    document.getElementById('emailSystemNotification').checked = notificationSettings.email_system || false;
-    document.getElementById('browserNotification').checked = notificationSettings.browser_notification || false;
-    document.getElementById('soundNotification').checked = notificationSettings.sound_notification || false;
-    document.getElementById('smsNotification').checked = notificationSettings.sms_notification || false;
+    document.getElementById('chatNotification').checked = notificationSettings.chat_notification !== undefined ? notificationSettings.chat_notification : true;
+    document.getElementById('commentNotification').checked = notificationSettings.comment_notification !== undefined ? notificationSettings.comment_notification : true;
 }
 
-// 알림 설정 저장
+// 개별 설정 실시간 저장
+async function saveNotificationSetting(settingId, value) {
+    const settingMap = {
+        'chatNotification': 'chat_notification',
+        'commentNotification': 'comment_notification'
+    };
+    
+    const settingKey = settingMap[settingId];
+    if (!settingKey) return;
+    
+    // 현재 설정값 가져오기
+    const currentSettings = {
+        chat_notification: document.getElementById('chatNotification').checked,
+        comment_notification: document.getElementById('commentNotification').checked
+    };
+    
+    try {
+        const response = await apiRequest('/notifications/settings', {
+            method: 'PUT',
+            body: JSON.stringify(currentSettings)
+        });
+        
+        // 응답에서 업데이트된 설정값 사용
+        if (response.settings) {
+            notificationSettings = response.settings;
+            console.log('💾 저장된 설정:', response.settings);
+        } else {
+            // 응답에 settings가 없으면 로컬 값 사용
+            notificationSettings[settingKey] = value;
+        }
+        
+        console.log(`💾 ${settingId} 설정 ${value ? 'ON' : 'OFF'}으로 변경됨`);
+        
+        // 알림 설정 변경 로그
+        if (settingKey === 'chat_notification') {
+            console.log(`💬 채팅 알림 ${value ? 'ON' : 'OFF'}`);
+        } else if (settingKey === 'comment_notification') {
+            console.log(`💭 댓글 알림 ${value ? 'ON' : 'OFF'}`);
+        }
+        
+    } catch (error) {
+        console.error('설정 저장 실패:', error);
+        // 실패 시 원래 상태로 복구
+        document.getElementById(settingId).checked = !value;
+        showToast('설정 저장에 실패했습니다.', 'error');
+    }
+}
+
+// 알림 설정 저장 (폼 제출 시)
 async function handleSettingsSave(e) {
     e.preventDefault();
     
     const settings = {
-        email_comment: document.getElementById('emailCommentNotification').checked,
-        email_message: document.getElementById('emailMessageNotification').checked,
-        email_system: document.getElementById('emailSystemNotification').checked,
         browser_notification: document.getElementById('browserNotification').checked,
-        sound_notification: document.getElementById('soundNotification').checked,
-        sms_notification: document.getElementById('smsNotification').checked
+        chat_notification: document.getElementById('chatNotification').checked,
+        comment_notification: document.getElementById('commentNotification').checked
     };
     
     try {
@@ -165,6 +239,9 @@ async function handleSettingsSave(e) {
             method: 'PUT',
             body: JSON.stringify(settings)
         });
+        
+        // 전역 설정 업데이트
+        notificationSettings = settings;
         
         showToast('알림 설정이 저장되었습니다.', 'success');
         
@@ -192,8 +269,7 @@ function testBrowserNotification() {
     if ('Notification' in window) {
         if (Notification.permission === 'granted') {
             new Notification('알림 테스트', {
-                body: '브라우저 알림이 정상적으로 작동합니다.',
-                icon: '/static/images/notification-icon.png'
+                body: '브라우저 알림이 정상적으로 작동합니다.'
             });
             showToast('브라우저 알림을 전송했습니다.', 'success');
         } else {
@@ -353,27 +429,82 @@ function setupRealtimeNotifications() {
 
 // 실시간 알림 표시
 function showRealtimeNotification(notification) {
-    // 브라우저 알림
-    if (notificationSettings.browser_notification && 'Notification' in window && Notification.permission === 'granted') {
+    // 브라우저 알림 (브라우저 권한만 확인)
+    if ('Notification' in window && Notification.permission === 'granted') {
         new Notification(notification.title, {
-            body: notification.message,
-            icon: '/static/images/notification-icon.png'
+            body: notification.message
         });
-    }
-    
-    // 소리 알림
-    if (notificationSettings.sound_notification) {
-        playNotificationSound();
     }
     
     // 토스트 알림
     showToast(notification.message, 'info');
 }
 
-// 알림 소리 재생
-function playNotificationSound() {
-    const audio = new Audio('/static/sounds/notification.mp3');
-    audio.play().catch(e => console.log('소리 재생 실패:', e));
+// 알림 클릭 시 채팅방으로 이동
+async function openChatFromNotification(notificationId, roomId, senderId, senderName) {
+    try {
+        // 알림 읽음 처리
+        if (typeof markAsRead === 'function') {
+            await markAsRead(notificationId);
+        }
+        
+        // 채팅 페이지로 이동
+        if (window.location.pathname !== '/chat') {
+            // 채팅 페이지로 이동하면서 roomId 전달
+            window.location.href = `/chat?roomId=${roomId}`;
+        } else {
+            // 이미 채팅 페이지에 있는 경우 바로 채팅방 선택
+            // chat.js의 selectChatRoom 함수 사용
+            if (typeof selectChatRoom === 'function') {
+                // 채팅방 정보 가져오기
+                const response = await fetch('/api/chat/rooms', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const room = data.rooms.find(r => r.room_id === roomId);
+                    if (room) {
+                        selectChatRoom(
+                            room.room_id,
+                            room.other_user_id,
+                            room.other_user_name,
+                            room.other_user_user_id,
+                            room.other_user_online
+                        );
+                    }
+                }
+            } else {
+                // chat.js가 아직 로드되지 않은 경우
+                window.location.href = `/chat?roomId=${roomId}`;
+            }
+        }
+    } catch (error) {
+        console.error('채팅방 이동 실패:', error);
+        if (typeof showToast === 'function') {
+            showToast('채팅방을 열 수 없습니다.', 'error');
+        }
+    }
+}
+
+// 알림 클릭 시 게시글로 이동
+async function openPostFromNotification(notificationId, postId) {
+    try {
+        // 알림 읽음 처리
+        if (typeof markAsRead === 'function') {
+            await markAsRead(notificationId);
+        }
+        
+        // 게시글 상세 페이지로 이동
+        window.location.href = `/posts/${postId}`;
+    } catch (error) {
+        console.error('게시글 이동 실패:', error);
+        if (typeof showToast === 'function') {
+            showToast('게시글을 열 수 없습니다.', 'error');
+        }
+    }
 }
 
 // 로그아웃

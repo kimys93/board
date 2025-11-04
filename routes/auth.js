@@ -2,9 +2,48 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const pool = require('../config/database');
 
 const router = express.Router();
+
+// 프로필 이미지 업로드를 위한 multer 설정
+const profileStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const uploadDir = path.join(__dirname, '../uploads/profiles');
+        // 디렉토리가 없으면 생성
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, 'profile-' + uniqueSuffix + ext);
+    }
+});
+
+const profileUpload = multer({
+    storage: profileStorage,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB
+    },
+    fileFilter: function (req, file, cb) {
+        // 이미지 파일만 허용
+        const allowedTypes = /jpeg|jpg|png|gif|webp/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+
+        if (extname && mimetype) {
+            return cb(null, true);
+        } else {
+            cb(new Error('이미지 파일만 업로드할 수 있습니다. (JPG, PNG, GIF, WEBP)'));
+        }
+    }
+});
 
 // 회원가입
 router.post('/register', [
@@ -291,11 +330,28 @@ router.get('/profile', require('../middleware/auth').authenticateToken, async (r
     }
 });
 
-// 프로필 업데이트
-router.put('/profile', require('../middleware/auth').authenticateToken, async (req, res) => {
+// 프로필 업데이트 (파일 업로드 선택적)
+router.put('/profile', require('../middleware/auth').authenticateToken, (req, res, next) => {
+    // Content-Type이 multipart/form-data인 경우에만 multer 사용
+    if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
+        profileUpload.single('profile_image')(req, res, next);
+    } else {
+        // JSON 요청인 경우 바로 다음 미들웨어로
+        next();
+    }
+}, async (req, res) => {
     try {
+        // FormData 또는 JSON에서 텍스트 필드 파싱
         const { name, email, gender, phone } = req.body;
         const userId = req.user.id;
+
+        // 필수 필드 검증
+        if (!name || !email || !gender || !phone) {
+            return res.status(400).json({
+                success: false,
+                message: '모든 필드를 입력해주세요.'
+            });
+        }
 
         // 이메일 중복 확인 (자신 제외)
         const [existingEmail] = await pool.query(
@@ -310,16 +366,28 @@ router.put('/profile', require('../middleware/auth').authenticateToken, async (r
             });
         }
 
-
         // 프로필 이미지 처리
         let profileImage = null;
-        if (req.files && req.files.profile_image) {
-            const file = req.files.profile_image;
-            const fileName = `${Date.now()}_${file.name}`;
-            const filePath = `uploads/profiles/${fileName}`;
+        if (req.file) {
+            // multer가 업로드한 파일 경로
+            profileImage = `/uploads/profiles/${req.file.filename}`;
             
-            await file.mv(filePath);
-            profileImage = `/uploads/profiles/${fileName}`;
+            // 기존 프로필 이미지가 있다면 삭제
+            const [currentUser] = await pool.query(
+                'SELECT profile_image FROM users WHERE id = ?',
+                [userId]
+            );
+            
+            if (currentUser.length > 0 && currentUser[0].profile_image) {
+                const oldImagePath = path.join(__dirname, '..', currentUser[0].profile_image);
+                if (fs.existsSync(oldImagePath)) {
+                    try {
+                        fs.unlinkSync(oldImagePath);
+                    } catch (err) {
+                        console.error('기존 프로필 이미지 삭제 실패:', err);
+                    }
+                }
+            }
         }
 
         // 프로필 업데이트
@@ -344,6 +412,16 @@ router.put('/profile', require('../middleware/auth').authenticateToken, async (r
         });
     } catch (error) {
         console.error('프로필 업데이트 오류:', error);
+        
+        // 업로드된 파일이 있다면 삭제
+        if (req.file && fs.existsSync(req.file.path)) {
+            try {
+                fs.unlinkSync(req.file.path);
+            } catch (err) {
+                console.error('업로드된 파일 삭제 실패:', err);
+            }
+        }
+        
         res.status(500).json({
             success: false,
             message: '서버 오류가 발생했습니다.'

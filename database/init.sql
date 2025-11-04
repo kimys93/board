@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     title VARCHAR(200) NOT NULL,
     message TEXT NOT NULL,
     type ENUM('comment', 'message', 'system', 'warning', 'success', 'test') NOT NULL,
-    is_read BOOLEAN DEFAULT FALSE,
+    read_status TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -86,12 +86,9 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE TABLE IF NOT EXISTS notification_settings (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    email_comment BOOLEAN DEFAULT TRUE,
-    email_message BOOLEAN DEFAULT TRUE,
-    email_system BOOLEAN DEFAULT TRUE,
     browser_notification BOOLEAN DEFAULT TRUE,
-    sound_notification BOOLEAN DEFAULT TRUE,
-    sms_notification BOOLEAN DEFAULT FALSE,
+    chat_notification BOOLEAN DEFAULT TRUE,
+    comment_notification BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -107,7 +104,7 @@ CREATE INDEX idx_attachments_post ON attachments(post_id);
 CREATE INDEX idx_chat_messages_user ON chat_messages(user_id);
 CREATE INDEX idx_chat_messages_created ON chat_messages(created_at);
 CREATE INDEX idx_notifications_user ON notifications(user_id);
-CREATE INDEX idx_notifications_read ON notifications(is_read);
+CREATE INDEX idx_notifications_read ON notifications(read_status);
 CREATE INDEX idx_notifications_created ON notifications(created_at);
 CREATE INDEX idx_notification_settings_user ON notification_settings(user_id);
 
@@ -123,17 +120,6 @@ CREATE TABLE IF NOT EXISTS chat_rooms (
     UNIQUE KEY unique_chat (user1_id, user2_id)
 );
 
--- 개인 채팅 메시지 테이블
-CREATE TABLE IF NOT EXISTS chat_messages (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    room_id INT NOT NULL,
-    sender_id INT NOT NULL,
-    message TEXT NOT NULL,
-    is_read BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE,
-    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
-);
 
 -- 사용자 온라인 상태 테이블
 CREATE TABLE IF NOT EXISTS user_status (
@@ -146,7 +132,5 @@ CREATE TABLE IF NOT EXISTS user_status (
 -- 개인 채팅 관련 인덱스
 CREATE INDEX IF NOT EXISTS idx_chat_rooms_user1 ON chat_rooms(user1_id);
 CREATE INDEX IF NOT EXISTS idx_chat_rooms_user2 ON chat_rooms(user2_id);
-CREATE INDEX IF NOT EXISTS idx_chat_messages_room ON chat_messages(room_id);
-CREATE INDEX IF NOT EXISTS idx_chat_messages_sender ON chat_messages(sender_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_user_status_online ON user_status(is_online);

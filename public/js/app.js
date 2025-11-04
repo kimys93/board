@@ -243,9 +243,25 @@ function logout() {
 async function loadPosts(page = 1) {
     try {
         showLoading(true);
-        const search = document.getElementById('searchInput').value;
+        const searchInput = document.getElementById('searchInput');
+        const originalValue = searchInput?.value || '';
+        const search = originalValue.trim();
+        const searchType = document.getElementById('searchType')?.value || 'title';
         const params = new URLSearchParams({ page, limit: 10 });
-        if (search) params.append('search', search);
+        
+        // 원본 값이 빈 문자열이 아니고, trim() 후에도 값이 있을 때만 검색 파라미터 추가
+        // (진짜 빈 값일 때는 전체 게시글 표시, 공백만 있을 때는 검색하지 않음)
+        if (originalValue === '') {
+            // 진짜 빈 값일 때는 전체 게시글 표시 (아무 파라미터도 추가하지 않음)
+        } else if (search) {
+            // 검색어가 있을 때만 검색 파라미터 추가
+            params.append('search', search);
+            params.append('searchType', searchType);
+        } else {
+            // 공백만 입력된 경우 검색하지 않음 (현재 상태 유지)
+            showLoading(false);
+            return;
+        }
         
         const response = await apiRequest(`/posts?${params}`);
         displayPosts(response.data.posts);
