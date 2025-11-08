@@ -36,9 +36,23 @@ async function handleLogin(e) {
         localStorage.setItem('token', response.token);
         currentUser = response.user;
         
+        // 로그인 시 온라인 상태로 설정
+        try {
+            await fetch('/api/chat/status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${response.token}`
+                },
+                body: JSON.stringify({ isOnline: true })
+            });
+        } catch (error) {
+            console.error('온라인 상태 설정 실패:', error);
+        }
+        
         // navbar 새로고침하여 실시간 상태 업데이트
         if (window.navbarInstance) {
-            window.navbarInstance.checkAuthStatus();
+            await window.navbarInstance.checkAuthStatus();
         }
         
         showToast('로그인되었습니다.', 'success');

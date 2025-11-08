@@ -24,7 +24,7 @@ router.post('/', authenticateToken, [
         const author_id = req.user.id;
 
         // 댓글 작성
-        const [result] = await pool.execute(
+        const [result] = await pool.query(
             'INSERT INTO comments (post_id, author_id, content) VALUES (?, ?, ?)',
             [post_id, author_id, content]
         );
@@ -140,7 +140,7 @@ router.put('/:commentId', authenticateToken, [
         const userId = req.user.id;
 
         // 댓글 작성자 확인
-        const [comment] = await pool.execute(
+        const [comment] = await pool.query(
             'SELECT author_id FROM comments WHERE id = ?',
             [commentId]
         );
@@ -160,7 +160,7 @@ router.put('/:commentId', authenticateToken, [
         }
 
         // 댓글 수정
-        await pool.execute(
+        await pool.query(
             'UPDATE comments SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
             [content, commentId]
         );
@@ -304,17 +304,17 @@ router.post('/:postId', authenticateToken, [
                     if (shouldNotify) {
                         // 댓글 작성자 정보 가져오기
                         const [commentAuthor] = await pool.query(
-                            'SELECT name, user_id FROM users WHERE id = ?',
+                            'SELECT username FROM users WHERE id = ?',
                             [authorId]
                         );
 
                         if (commentAuthor.length > 0) {
-                            const notificationMessage = `${commentAuthor[0].name || commentAuthor[0].user_id}님이 "${postTitle}" 게시글에 댓글을 남겼습니다.`;
+                            const notificationMessage = `${commentAuthor[0].username}님이 "${postTitle}" 게시글에 댓글을 남겼습니다.`;
                             const notificationData = {
                                 message: notificationMessage,
                                 postId: parseInt(postId),
                                 commentId: result.insertId,
-                                authorName: commentAuthor[0].name || commentAuthor[0].user_id
+                                authorName: commentAuthor[0].username
                             };
 
                             // 알림 생성

@@ -41,6 +41,7 @@ services:
       - ./config:/app/config
       - ./middleware:/app/middleware
       - ./server.js:/app/server.js
+      - ./siteAuth.credentials:/app/siteAuth.credentials
     networks:
       - board_network
 

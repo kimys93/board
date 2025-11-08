@@ -267,6 +267,28 @@ router.post('/login', [
             { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
         );
 
+        // 로그인 시 온라인 상태로 설정
+        try {
+            const pool = require('../config/database');
+            await pool.query(
+                `INSERT INTO user_status (user_id, is_online, last_seen) 
+                 VALUES (?, ?, CURRENT_TIMESTAMP) 
+                 ON DUPLICATE KEY UPDATE 
+                 is_online = VALUES(is_online), 
+                 last_seen = CURRENT_TIMESTAMP`,
+                [user.id, true]
+            );
+            
+            // WebSocket으로 상태 변경 브로드캐스트
+            const broadcastUserStatusChange = req.app.get('broadcastUserStatusChange');
+            if (broadcastUserStatusChange) {
+                broadcastUserStatusChange(user.id, user.name, true);
+            }
+        } catch (error) {
+            console.error('온라인 상태 설정 실패:', error);
+            // 로그인은 성공으로 처리
+        }
+
         res.json({
             success: true,
             message: '로그인 성공',

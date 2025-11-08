@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const path = require('path');
 const multer = require('multer');
 const WebSocket = require('ws');
@@ -26,6 +27,7 @@ const upload = multer({ storage: storage });
 
 // 미들웨어 설정
 app.use(cors());
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/static', express.static(path.join(__dirname, 'public')));
@@ -162,8 +164,8 @@ wss.on('connection', (ws, req) => {
                             userId = decoded.userId;
                             username = decoded.username;
                             
-                            // 클라이언트 정보 저장
-                            clients.set(ws, { userId, username });
+                            // 클라이언트 정보 저장 (현재 보고 있는 채팅방 ID 포함)
+                            clients.set(ws, { userId, username, currentRoomId: null });
                             
                             // 다른 클라이언트들에게 사용자 입장 알림
                             broadcast({
@@ -224,6 +226,17 @@ wss.on('connection', (ws, req) => {
                             type: 'stop_typing',
                             user: username
                         }, ws);
+                    }
+                    break;
+                    
+                case 'viewing_room':
+                    // 사용자가 현재 보고 있는 채팅방 ID 업데이트
+                    if (userId) {
+                        const clientInfo = clients.get(ws);
+                        if (clientInfo) {
+                            clientInfo.currentRoomId = message.roomId || null;
+                            console.log(`👁️ 사용자 ${userId}가 채팅방 ${message.roomId || '없음'}을 보고 있습니다.`);
+                        }
                     }
                     break;
             }
@@ -325,14 +338,15 @@ function broadcastOnlineUsers() {
 }
 
 // 사용자 상태 변경 브로드캐스트
-function broadcastUserStatusChange(userId, isOnline) {
-    console.log(`🔄 사용자 상태 변경 브로드캐스트: userId ${userId} -> ${isOnline ? '온라인' : '오프라인'}`);
+function broadcastUserStatusChange(userId, username, isOnline) {
+    console.log(`🔄 사용자 상태 변경 브로드캐스트: userId ${userId} (${username || 'unknown'}) -> ${isOnline ? '온라인' : '오프라인'}`);
     console.log(`📡 연결된 클라이언트 수: ${clients.size}`);
     
     // 직접 브로드캐스트 실행
     const message = JSON.stringify({
         type: 'user_status_change',
         userId: userId,
+        username: username,
         isOnline: isOnline
     });
     
@@ -367,6 +381,27 @@ function broadcastNotification(targetUserId, notification) {
     console.log(`📤 알림 브로드캐스트 완료: ${sentCount}개 클라이언트에게 전송`);
 }
 
+// 채팅 메시지 브로드캐스트 (특정 채팅방의 사용자들에게만)
+function broadcastChatMessage(roomId, messageData) {
+    console.log(`💬 채팅 메시지 브로드캐스트: roomId ${roomId}`);
+    
+    const message = JSON.stringify({
+        type: 'chat_message',
+        roomId: roomId,
+        message: messageData
+    });
+    
+    let sentCount = 0;
+    clients.forEach((clientInfo, ws) => {
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(message);
+            sentCount++;
+        }
+    });
+    
+    console.log(`📤 채팅 메시지 브로드캐스트 완료: ${sentCount}개 클라이언트에게 전송`);
+}
+
 // 메시지를 데이터베이스에 저장
 async function saveMessage(messageData) {
     try {
@@ -380,9 +415,23 @@ async function saveMessage(messageData) {
     }
 }
 
+// 사용자가 특정 채팅방을 보고 있는지 확인
+function isUserViewingRoom(userId, roomId) {
+    for (const [ws, clientInfo] of clients.entries()) {
+        if (ws.readyState === WebSocket.OPEN && 
+            clientInfo.userId === userId && 
+            clientInfo.currentRoomId === roomId) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // 앱에 브로드캐스트 함수 등록
 app.set('broadcastUserStatusChange', broadcastUserStatusChange);
 app.set('broadcastNotification', broadcastNotification);
+app.set('broadcastChatMessage', broadcastChatMessage);
+app.set('isUserViewingRoom', isUserViewingRoom);
 
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`서버가 포트 ${PORT}에서 실행 중입니다. (0.0.0.0:${PORT})`);

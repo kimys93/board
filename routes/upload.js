@@ -88,7 +88,7 @@ router.post('/', authenticateToken, (req, res, next) => {
         }
 
         // 게시글 소유자 확인
-        const [posts] = await pool.execute(
+        const [posts] = await pool.query(
             'SELECT author_id FROM posts WHERE id = ?',
             [postId]
         );
@@ -112,7 +112,7 @@ router.post('/', authenticateToken, (req, res, next) => {
         }
 
         // 파일 정보를 데이터베이스에 저장
-        const [result] = await pool.execute(
+        const [result] = await pool.query(
             'INSERT INTO attachments (post_id, filename, original_name, file_path, file_size, mime_type) VALUES (?, ?, ?, ?, ?, ?)',
             [
                 postId,
@@ -155,7 +155,7 @@ router.get('/:filename', async (req, res) => {
     try {
         const filename = req.params.filename;
 
-        const [files] = await pool.execute(
+        const [files] = await pool.query(
             'SELECT filename, original_name, file_path, mime_type FROM attachments WHERE filename = ?',
             [filename]
         );
@@ -197,7 +197,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         const userId = req.user.id;
 
         // 파일 정보 조회
-        const [files] = await pool.execute(
+        const [files] = await pool.query(
             'SELECT a.*, p.author_id FROM attachments a JOIN posts p ON a.post_id = p.id WHERE a.id = ?',
             [fileId]
         );
@@ -225,7 +225,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         }
 
         // 데이터베이스에서 파일 정보 삭제
-        await pool.execute('DELETE FROM attachments WHERE id = ?', [fileId]);
+        await pool.query('DELETE FROM attachments WHERE id = ?', [fileId]);
 
         res.json({
             success: true,

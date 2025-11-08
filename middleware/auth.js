@@ -16,7 +16,7 @@ const authenticateToken = async (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         
         // 사용자 정보 확인
-        const [users] = await pool.execute(
+        const [users] = await pool.query(
             'SELECT id, user_id, name, email FROM users WHERE id = ?',
             [decoded.userId]
         );

@@ -62,7 +62,9 @@ router.get('/rooms', auth.authenticateToken, async (req, res) => {
              FROM chat_rooms cr
              LEFT JOIN users u ON (CASE WHEN cr.user1_id = ? THEN cr.user2_id ELSE cr.user1_id END) = u.id
              LEFT JOIN user_status us ON u.id = us.user_id
-             LEFT JOIN chat_messages cm ON cr.id = cm.id
+             LEFT JOIN chat_messages cm ON cm.room_id = cr.id AND cm.id = (
+                 SELECT MAX(id) FROM chat_messages WHERE room_id = cr.id
+             )
              WHERE cr.user1_id = ? OR cr.user2_id = ?
              ORDER BY cr.updated_at DESC`,
             [currentUserId, currentUserId, currentUserId, currentUserId]
@@ -158,19 +160,15 @@ router.get('/messages/:roomId', auth.authenticateToken, async (req, res) => {
             });
         }
 
-        // 현재 데이터베이스 구조에 맞춰 간단하게 처리
+        // 채팅방 메시지 조회
         const [messages] = await pool.query(
             `SELECT cm.id, cm.content as message, cm.user_id as sender_id, cm.created_at,
                     u.name as sender_name, u.user_id as sender_user_id
              FROM chat_messages cm
              JOIN users u ON cm.user_id = u.id
-             WHERE cm.user_id = ? OR cm.user_id IN (
-                 SELECT CASE WHEN cr.user1_id = ? THEN cr.user2_id ELSE cr.user1_id END
-                 FROM chat_rooms cr 
-                 WHERE cr.id = ? AND (cr.user1_id = ? OR cr.user2_id = ?)
-             )
+             WHERE cm.room_id = ?
              ORDER BY cm.created_at ASC`,
-            [currentUserId, currentUserId, roomId, currentUserId, currentUserId]
+            [roomId]
         );
 
         // 메시지를 읽음으로 표시 (현재 테이블 구조에서는 읽음 상태 컬럼이 없으므로 생략)
@@ -221,10 +219,10 @@ router.post('/message', auth.authenticateToken, async (req, res) => {
         const room = rooms[0];
         const otherUserId = room.user1_id === currentUserId ? room.user2_id : room.user1_id;
 
-        // 메시지 저장 (기존 테이블 구조 사용)
+        // 메시지 저장
         const [result] = await pool.query(
-            'INSERT INTO chat_messages (user_id, username, content, message_type) VALUES (?, ?, ?, ?)',
-            [currentUserId, req.user.name || req.user.user_id, message.trim(), 'text']
+            'INSERT INTO chat_messages (room_id, user_id, username, content, message_type) VALUES (?, ?, ?, ?, ?)',
+            [roomId, currentUserId, req.user.name || req.user.user_id, message.trim(), 'text']
         );
 
         // 채팅방 업데이트 시간 갱신
@@ -232,6 +230,19 @@ router.post('/message', auth.authenticateToken, async (req, res) => {
             'UPDATE chat_rooms SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
             [roomId]
         );
+
+        // WebSocket으로 채팅 메시지 브로드캐스트
+        const broadcastChatMessage = req.app.get('broadcastChatMessage');
+        if (broadcastChatMessage) {
+            broadcastChatMessage(roomId, {
+                id: result.insertId,
+                room_id: roomId,
+                user_id: currentUserId,
+                username: req.user.name || req.user.user_id,
+                content: message.trim(),
+                created_at: new Date().toISOString()
+            });
+        }
 
         // 상대방에게 알림 생성 (알림 설정 확인)
         try {
@@ -259,39 +270,97 @@ router.post('/message', auth.authenticateToken, async (req, res) => {
 
             // 알림 설정이 ON인 경우에만 알림 생성 및 전송
             if (shouldNotify) {
-                // 상대방 사용자 정보 가져오기
-                const [otherUser] = await pool.query(
-                    'SELECT name FROM users WHERE id = ?',
-                    [otherUserId]
-                );
-
-                if (otherUser.length > 0) {
-                    // 알림 메시지에 room_id 포함 (채팅방 이동을 위해)
-                    const notificationMessage = `${req.user.name || req.user.user_id}: ${message.trim().substring(0, 50)}${message.trim().length > 50 ? '...' : ''}`;
-                    const notificationData = {
-                        message: notificationMessage,
-                        roomId: roomId,
-                        senderId: currentUserId,
-                        senderName: req.user.name || req.user.user_id
-                    };
-
-                    // 알림 생성 (message에 JSON 데이터 포함)
-                    await pool.query(
-                        'INSERT INTO notifications (user_id, title, message, type, read_status) VALUES (?, ?, ?, ?, 0)',
-                        [otherUserId, `새 메시지`, JSON.stringify(notificationData), 'message']
+                // 상대방이 현재 해당 채팅방을 보고 있는지 확인
+                const isUserViewingRoom = req.app.get('isUserViewingRoom');
+                if (isUserViewingRoom && isUserViewingRoom(otherUserId, roomId)) {
+                    console.log(`💬 사용자 ${otherUserId}가 채팅방 ${roomId}를 보고 있으므로 알림을 생성하지 않습니다.`);
+                    // 상대방이 채팅방을 보고 있으면 알림 생성하지 않음
+                } else {
+                    // 상대방 사용자 정보 가져오기
+                    const [otherUser] = await pool.query(
+                        'SELECT name FROM users WHERE id = ?',
+                        [otherUserId]
                     );
 
-                    // WebSocket으로 실시간 알림 전달
-                    const broadcastNotification = req.app.get('broadcastNotification');
-                    if (broadcastNotification) {
-                        broadcastNotification(otherUserId, {
-                            title: '새 메시지',
+                    if (otherUser.length > 0) {
+                        // 같은 사용자로부터의 읽지 않은 메시지 알림이 있는지 확인
+                        const [existingNotifications] = await pool.query(
+                            `SELECT id, message FROM notifications 
+                             WHERE user_id = ? AND type = 'message' AND read_status = 0 
+                             AND JSON_EXTRACT(message, '$.senderId') = ?
+                             ORDER BY created_at DESC LIMIT 1`,
+                            [otherUserId, currentUserId]
+                        );
+
+                        const notificationMessage = `${req.user.name || req.user.user_id}: ${message.trim().substring(0, 50)}${message.trim().length > 50 ? '...' : ''}`;
+                        const notificationData = {
                             message: notificationMessage,
-                            type: 'message',
                             roomId: roomId,
                             senderId: currentUserId,
                             senderName: req.user.name || req.user.user_id
-                        });
+                        };
+
+                        if (existingNotifications.length > 0) {
+                            // 기존 알림이 있으면 업데이트 (메시지 개수 카운트)
+                            const existingData = JSON.parse(existingNotifications[0].message);
+                            const messageCount = (existingData.messageCount || 1) + 1;
+                            
+                            // 메시지 목록에 추가 (최대 10개까지만 저장)
+                            const messages = existingData.messages || [];
+                            messages.push(notificationMessage);
+                            if (messages.length > 10) {
+                                messages.shift(); // 가장 오래된 메시지 제거
+                            }
+                            
+                            notificationData.messageCount = messageCount;
+                            notificationData.lastMessage = notificationMessage;
+                            notificationData.messages = messages;
+                            
+                            // 기존 알림 업데이트
+                            await pool.query(
+                                `UPDATE notifications 
+                                 SET message = ?, created_at = CURRENT_TIMESTAMP 
+                                 WHERE id = ?`,
+                                [JSON.stringify(notificationData), existingNotifications[0].id]
+                            );
+
+                            // WebSocket으로 실시간 알림 전달 (업데이트된 메시지 개수 포함)
+                            const broadcastNotification = req.app.get('broadcastNotification');
+                            if (broadcastNotification) {
+                                broadcastNotification(otherUserId, {
+                                    title: `새 메시지 (${messageCount}개)`,
+                                    message: notificationMessage,
+                                    type: 'message',
+                                    roomId: roomId,
+                                    senderId: currentUserId,
+                                    senderName: req.user.name || req.user.user_id,
+                                    messageCount: messageCount
+                                });
+                            }
+                        } else {
+                            // 새로운 알림 생성
+                            notificationData.messageCount = 1;
+                            notificationData.lastMessage = notificationMessage;
+                            notificationData.messages = [notificationMessage];
+                            
+                            await pool.query(
+                                'INSERT INTO notifications (user_id, title, message, type, read_status) VALUES (?, ?, ?, ?, 0)',
+                                [otherUserId, `새 메시지`, JSON.stringify(notificationData), 'message']
+                            );
+
+                            // WebSocket으로 실시간 알림 전달
+                            const broadcastNotification = req.app.get('broadcastNotification');
+                            if (broadcastNotification) {
+                                broadcastNotification(otherUserId, {
+                                    title: '새 메시지',
+                                    message: notificationMessage,
+                                    type: 'message',
+                                    roomId: roomId,
+                                    senderId: currentUserId,
+                                    senderName: req.user.name || req.user.user_id
+                                });
+                            }
+                        }
                     }
                 }
             } else {
@@ -333,7 +402,7 @@ router.post('/status', auth.authenticateToken, async (req, res) => {
         // WebSocket으로 상태 변경 브로드캐스트
         const broadcastUserStatusChange = req.app.get('broadcastUserStatusChange');
         if (broadcastUserStatusChange) {
-            broadcastUserStatusChange(currentUserId, req.user.username, isOnline);
+            broadcastUserStatusChange(currentUserId, req.user.name || req.user.user_id, isOnline);
         }
 
         res.json({

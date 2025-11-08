@@ -55,8 +55,7 @@ router.get('/', async (req, res) => {
             countQuery = `SELECT COUNT(*) as total FROM posts p`;
         }
         
-        const [countResult] = await pool.execute(countQuery, queryParams);
-        console.log('Count result:', countResult);
+        const [countResult] = await pool.query(countQuery, queryParams);
         const totalPosts = countResult[0].total;
 
         // 게시글 목록 조회 (작성자 정보 표시를 위해 항상 JOIN 필요)
@@ -156,7 +155,7 @@ router.get('/:id', async (req, res) => {
         }
 
         // 조회수 증가
-        await pool.execute(
+        await pool.query(
             'UPDATE posts SET view_count = view_count + 1 WHERE id = ?',
             [postId]
         );
@@ -201,7 +200,7 @@ router.post('/', authenticateToken, [
         const { title, content } = req.body;
         const authorId = req.user.id;
 
-        const [result] = await pool.execute(
+        const [result] = await pool.query(
             'INSERT INTO posts (title, content, author_id) VALUES (?, ?, ?)',
             [title, content, authorId]
         );
@@ -240,7 +239,7 @@ router.put('/:id', authenticateToken, [
         const userId = req.user.id;
 
         // 게시글 소유자 확인
-        const [posts] = await pool.execute(
+        const [posts] = await pool.query(
             'SELECT author_id FROM posts WHERE id = ?',
             [postId]
         );
@@ -259,7 +258,7 @@ router.put('/:id', authenticateToken, [
             });
         }
 
-        await pool.execute(
+        await pool.query(
             'UPDATE posts SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
             [title, content, postId]
         );
@@ -284,7 +283,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         const userId = req.user.id;
 
         // 게시글 소유자 확인
-        const [posts] = await pool.execute(
+        const [posts] = await pool.query(
             'SELECT author_id FROM posts WHERE id = ?',
             [postId]
         );
@@ -303,7 +302,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
             });
         }
 
-        await pool.execute('DELETE FROM posts WHERE id = ?', [postId]);
+        await pool.query('DELETE FROM posts WHERE id = ?', [postId]);
 
         res.json({
             success: true,

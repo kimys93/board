@@ -15,7 +15,7 @@ async function initializeApp() {
     await checkAuth();
     setupEventListeners();
     loadChatRooms();
-    updateOnlineStatus(true);
+    // 온라인 상태는 navbar에서 관리하므로 여기서는 설정하지 않음
     setupWebSocket();
     
     // URL 파라미터에서 roomId 확인 (알림 클릭으로 이동한 경우)
@@ -37,6 +37,9 @@ async function initializeApp() {
             // URL에서 roomId 제거
             window.history.replaceState({}, '', '/chat');
         }, 500);
+    } else {
+        // 채팅방이 열려있지 않으면 서버에 알림
+        notifyServerViewingRoom(null);
     }
 }
 
@@ -87,9 +90,18 @@ function setupEventListeners() {
         }
     });
     
-    // 페이지 언로드 시 온라인 상태 해제
+    // 페이지 언로드 시 서버에 채팅방을 보고 있지 않다고 알림
     window.addEventListener('beforeunload', function() {
-        updateOnlineStatus(false);
+        notifyServerViewingRoom(null);
+    });
+    
+    // 페이지가 숨겨질 때도 서버에 알림
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            notifyServerViewingRoom(null);
+        } else if (currentRoomId) {
+            notifyServerViewingRoom(currentRoomId);
+        }
     });
 }
 
@@ -315,6 +327,9 @@ function displayChatRooms() {
 // 채팅방 선택
 function selectChatRoom(roomId, otherUserId, otherUserName, otherUserUserId, isOnline) {
     currentRoomId = roomId;
+    // 전역 변수에 현재 채팅방 ID 저장 (알림 처리 시 사용)
+    window.currentChatRoomId = roomId;
+    
     currentOtherUser = {
         id: otherUserId,
         name: otherUserName,
@@ -323,11 +338,52 @@ function selectChatRoom(roomId, otherUserId, otherUserName, otherUserUserId, isO
     
     showChatInterface();
     loadMessages();
+    
+    // 서버에 현재 채팅방을 보고 있다고 알림
+    notifyServerViewingRoom(roomId);
+    
+    // 채팅방을 열었을 때 해당 채팅방의 모든 읽지 않은 메시지 알림을 읽음 처리
+    markChatRoomNotificationsAsRead(roomId);
+    
     loadChatRooms(); // 채팅방 목록 새로고침 (알림 상태 업데이트)
     
     // GNB 채팅 알림 상태 업데이트 (채팅방 선택 시 알림 제거)
     if (typeof window.updateChatNotificationStatus === 'function') {
         window.updateChatNotificationStatus();
+    }
+}
+
+// 서버에 현재 채팅방을 보고 있다고 알림
+function notifyServerViewingRoom(roomId) {
+    const navbar = window.navbarInstance;
+    if (navbar && navbar.ws && navbar.ws.readyState === WebSocket.OPEN) {
+        navbar.ws.send(JSON.stringify({
+            type: 'viewing_room',
+            roomId: roomId
+        }));
+        console.log(`📡 서버에 채팅방 ${roomId}를 보고 있다고 알림`);
+    }
+}
+
+// 채팅방의 메시지 알림 읽음 처리
+async function markChatRoomNotificationsAsRead(roomId) {
+    try {
+        const response = await fetch(`/api/notifications/read-chat-room/${roomId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (response.ok) {
+            console.log(`✅ 채팅방 ${roomId}의 알림을 읽음 처리했습니다.`);
+            // 알림 배지 업데이트
+            if (typeof window.updateChatNotificationStatus === 'function') {
+                window.updateChatNotificationStatus();
+            }
+        }
+    } catch (error) {
+        console.error('채팅방 알림 읽음 처리 실패:', error);
     }
 }
 
@@ -392,7 +448,8 @@ async function sendMessage() {
         
         if (response.ok) {
             messageInput.value = '';
-            loadMessages();
+            // WebSocket으로 메시지가 브로드캐스트되므로 loadMessages()는 호출하지 않음
+            // 대신 채팅방 목록만 업데이트
             loadChatRooms(); // 채팅방 목록 새로고침
             
             // GNB 채팅 알림 상태 업데이트
@@ -431,6 +488,51 @@ function setupWebSocket() {
     window.addEventListener('userStatusChange', function(event) {
         handleUserStatusChange(event.detail);
     });
+    
+    // 채팅 메시지 수신 이벤트 리스너
+    window.addEventListener('chatMessageReceived', function(event) {
+        const messageData = event.detail;
+        handleChatMessage(messageData);
+    });
+}
+
+// 채팅 메시지 처리
+function handleChatMessage(messageData) {
+    const { roomId, message } = messageData;
+    
+    // 현재 열려있는 채팅방의 메시지인지 확인
+    if (currentRoomId && currentRoomId === roomId) {
+        // 메시지를 UI에 추가
+        addMessageToUI(message);
+        // 채팅방 목록도 업데이트
+        loadChatRooms();
+    } else {
+        // 다른 채팅방의 메시지면 채팅방 목록만 업데이트
+        loadChatRooms();
+    }
+}
+
+// 메시지를 UI에 추가
+function addMessageToUI(message) {
+    const container = document.getElementById('chatMessages');
+    if (!container) return;
+    
+    const isOwnMessage = message.user_id === currentUser.id;
+    const messageHTML = `
+        <div class="message-item ${isOwnMessage ? 'message-sent' : 'message-received'}">
+            <div class="message-bubble">
+                ${message.content}
+            </div>
+            <div class="message-time">
+                ${formatMessageTime(message.created_at)}
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', messageHTML);
+    
+    // 스크롤을 맨 아래로
+    container.scrollTop = container.scrollHeight;
 }
 
 // 사용자 상태 변경 처리

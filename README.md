@@ -21,14 +21,18 @@ Node.js, Express, MySQL을 사용한 테스트 자동화 코드 연습을 위한
 
 ### 실시간 통신
 - **1:1 채팅** - WebSocket 기반 실시간 채팅
+- **실시간 메시지 표시** - 채팅 중 메시지 실시간 표시 (페이지 새로고침 불필요)
 - **사용자 검색** - 채팅 상대방 검색
 - **채팅방 관리** - 채팅방 목록 조회 및 메시지 히스토리
+- **스마트 알림** - 채팅 중일 때는 알림 생성하지 않음 (서버에서 사용자 뷰 상태 추적)
 
 ### 알림 시스템
 - **브라우저 알림** - 채팅 메시지 및 댓글 알림
 - **알림 설정** - 채팅/댓글 알림 ON/OFF 설정
 - **알림 목록** - 알림 조회, 읽음 처리, 삭제
 - **실시간 알림** - WebSocket을 통한 실시간 알림 수신
+- **스마트 알림 관리** - 채팅 중일 때는 알림 생성하지 않음, 채팅방 열면 자동 읽음 처리
+- **통합 메시지 알림** - 같은 사용자로부터 여러 메시지가 오면 하나의 알림으로 통합
 
 ### UI/UX
 - **반응형 디자인** - Bootstrap 5 사용
@@ -117,7 +121,21 @@ cp env.example .env
 # .env 파일 편집하여 데이터베이스 설정 확인
 ```
 
-### 3. Docker로 실행
+### 3. 사이트 접속 인증 설정
+
+```bash
+# siteAuth.credentials 파일 생성
+cp siteAuth.credentials.example siteAuth.credentials
+
+# siteAuth.credentials 파일 편집하여 실제 ID/PW 입력
+# SITE_ID=your_id
+# SITE_PW=your_password
+```
+
+> ⚠️ **중요**: `siteAuth.credentials` 파일은 `.gitignore`에 포함되어 GitHub에 푸시되지 않습니다.  
+> 이 파일에는 사이트 접속 인증에 사용되는 ID/PW가 저장되므로 절대 공개 저장소에 커밋하지 마세요.
+
+### 4. Docker로 실행
 
 ```bash
 # 모든 서비스 시작 (MySQL, Node.js, Jenkins)
@@ -127,20 +145,43 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
-### 4. 개별 서비스 접속
+### 5. 개별 서비스 접속
 
 - **웹 애플리케이션**: http://localhost:3000
   - 접속 시 HTTP Basic Authentication 다이얼로그 표시
-  - ID: `kimys`, 비밀번호: `L0veyUsung!@`
+  - `siteAuth.credentials` 파일에 설정한 ID/PW 입력
 - **Jenkins**: http://localhost:8080
 - **MySQL**: localhost:3306
 
-### 5. 외부 접속
+### 6. 네트워크 환경 및 접속 제한
 
-서버는 모든 IP에서 접속 가능합니다. 외부에서 접속하려면:
-- 서버 IP 주소 확인: `ipconfig` (Windows) 또는 `ifconfig` (Linux/Mac)
-- 브라우저에서 `http://서버IP:3000` 접속
-- HTTP Basic Authentication 다이얼로그에서 ID/PW 입력
+> ⚠️ **중요**: 현재 서버는 **로컬 네트워크(WiFi)에서만 접속 가능**합니다.
+
+#### 접속 가능한 환경
+- ✅ **같은 WiFi 네트워크에 연결된 기기**: 접속 가능
+- ✅ **같은 로컬 네트워크(192.168.x.x)의 기기**: 접속 가능
+
+#### 접속 불가능한 환경
+- ❌ **5G/LTE 모바일 데이터 네트워크**: 접속 불가
+- ❌ **인터넷을 통한 외부 접속**: 접속 불가
+
+#### 이유
+서버는 코드상으로 모든 네트워크에서 접속 가능하도록 설정되어 있지만, 실제 네트워크 인프라(라우터 방화벽, 포트 포워딩 없음)로 인해 외부 접속이 차단됩니다.
+
+#### 보안상 이점
+이 설정은 보안상 유리합니다:
+- 내부 네트워크만 접속 가능하여 외부 공격 차단
+- 라우터 방화벽이 추가 보안 계층 제공
+- 외부 인터넷에서 직접 접속 불가
+
+#### 외부 접속이 필요한 경우
+외부(5G/LTE, 인터넷)에서 접속하려면 다음 설정이 필요합니다:
+1. 라우터에서 포트 포워딩 설정 (3000번 포트)
+2. 방화벽에서 3000번 포트 허용
+3. 공인 IP 주소 확인
+
+> ⚠️ **보안 경고**: 외부 접속을 허용하면 보안 위험이 증가합니다.  
+> 반드시 강력한 비밀번호를 사용하고, 가능하면 HTTPS를 적용하세요.
 
 ## 🔧 개발 환경 설정
 
@@ -216,6 +257,7 @@ docker exec -it board_db mysql -u board_user -p board_db
 - `PUT /api/notifications/settings` - 알림 설정 업데이트
 - `PUT /api/notifications/:id/read` - 알림 읽음 처리
 - `PUT /api/notifications/read-all` - 모든 알림 읽음 처리
+- `PUT /api/notifications/read-chat-room/:roomId` - 특정 채팅방의 메시지 알림 읽음 처리
 - `DELETE /api/notifications/:id` - 알림 삭제
 - `DELETE /api/notifications/clear-all` - 모든 알림 삭제
 
@@ -233,6 +275,7 @@ docker exec -it board_db mysql -u board_user -p board_db
 
 - `auth` - 토큰 인증
 - `message` - 채팅 메시지 전송
+- `viewing_room` - 현재 보고 있는 채팅방 ID 전송 (서버에서 알림 생성 여부 판단)
 
 ### 서버 → 클라이언트
 
@@ -242,6 +285,7 @@ docker exec -it board_db mysql -u board_user -p board_db
 - `user_left` - 사용자 접속 해제
 - `user_status_change` - 사용자 상태 변경 (온라인/오프라인)
 - `notification` - 실시간 알림 (채팅 메시지, 댓글)
+- `chat_message` - 실시간 채팅 메시지 (채팅방에 열려있을 때 실시간 표시)
 
 ## 📊 데이터베이스 구조
 
@@ -270,14 +314,46 @@ docker exec -it board_db mysql -u board_user -p board_db
 ### 사이트 접속 인증
 
 사이트 접속 시 브라우저 기본 인증 다이얼로그가 표시됩니다.
-- **ID**: `kimys`
-- **비밀번호**: `L0veyUsung!@`
 
-> ⚠️ 프로덕션 환경에서는 반드시 비밀번호를 변경하세요.
+#### 인증 정보 설정
+
+1. `siteAuth.credentials.example` 파일을 `siteAuth.credentials`로 복사:
+   ```bash
+   cp siteAuth.credentials.example siteAuth.credentials
+   ```
+
+2. `siteAuth.credentials` 파일을 편집하여 실제 ID/PW 입력:
+   ```
+   SITE_ID=your_id
+   SITE_PW=your_password
+   ```
+
+3. Docker 컨테이너 재시작:
+   ```bash
+   docker-compose restart web
+   ```
+
+#### 인증 방식
+- **HTTP Basic Authentication**: 브라우저 기본 인증 다이얼로그 사용
+- **쿠키 기반 세션**: 인증 성공 후 24시간 동안 쿠키로 세션 유지
+- **네트워크 무관**: WiFi와 모바일 데이터 모두에서 동일하게 작동 (단, 로컬 네트워크 접속 제한은 유지)
+
+> ⚠️ **보안 주의사항**:
+> - `siteAuth.credentials` 파일은 절대 GitHub에 커밋하지 마세요
+> - 프로덕션 환경에서는 반드시 강력한 비밀번호를 사용하세요
+> - 정기적으로 비밀번호를 변경하세요
 
 ## 🎯 주요 업데이트 내역
 
-### v2.1 (최신)
+### v2.2 (최신)
+- ✅ 실시간 채팅 메시지 표시 기능 추가
+- ✅ 채팅 중일 때 알림 생성하지 않기 (서버에서 사용자 뷰 상태 추적)
+- ✅ 로그인/로그아웃 시 실시간 온라인 상태 반영
+- ✅ 채팅방 열었을 때 자동 읽음 처리
+- ✅ 통합 메시지 알림 (같은 사용자로부터 여러 메시지 통합)
+- ✅ WebSocket을 통한 채팅 메시지 브로드캐스트
+
+### v2.1
 - ✅ HTTP Basic Authentication 추가 (모든 IP 허용)
 - ✅ IP 필터링 제거 (외부 접속 완전 허용)
 - ✅ 불필요한 라이브러리 제거 (cookie-parser, jest)
@@ -303,6 +379,17 @@ docker exec -it board_db mysql -u board_user -p board_db
 
 ## ⚠️ 주의사항
 
+### 일반 주의사항
 - 이 프로젝트는 학습 목적으로 제작되었습니다.
 - 프로덕션 환경에서 사용 시 보안 및 성능 최적화가 필요합니다.
 - 데이터베이스 백업을 정기적으로 수행하세요.
+
+### 네트워크 환경
+- **로컬 네트워크 제한**: 현재 서버는 같은 WiFi 네트워크에 연결된 기기에서만 접속 가능합니다.
+- **5G/LTE 접속 불가**: 모바일 데이터 네트워크에서는 접속할 수 없습니다.
+- **보안상 이점**: 이 설정은 외부 공격을 차단하여 보안을 강화합니다.
+
+### 인증 설정
+- **siteAuth.credentials 필수**: 서버 실행 전 반드시 `siteAuth.credentials` 파일을 설정해야 합니다.
+- **파일 보안**: `siteAuth.credentials` 파일은 절대 공개 저장소에 커밋하지 마세요.
+- **비밀번호 강도**: 프로덕션 환경에서는 반드시 강력한 비밀번호를 사용하세요.

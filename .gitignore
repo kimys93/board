@@ -128,3 +128,6 @@ jenkins_data/
 # Build outputs
 build/
 dist/
+
+# Site authentication credentials
+siteAuth.credentials

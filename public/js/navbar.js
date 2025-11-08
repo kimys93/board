@@ -13,10 +13,13 @@ class NavBar {
         this.setActiveNavItem();
         // 로그인된 사용자라면 온라인 상태로 설정
         if (this.user) {
-            this.updateOnlineStatus(true);
+            // 온라인 상태 설정 (페이지 이동 시에도 유지)
+            await this.updateOnlineStatus(true);
             this.setupWebSocket();
             // 알림 상태 확인
             await this.checkNotificationStatus();
+            // 알림 목록 로드
+            this.loadNotificationList();
         }
     }
 
@@ -41,8 +44,10 @@ class NavBar {
                 this.createNavbar();
                 this.updateAuthUI();
                 // 로그인된 사용자라면 온라인 상태로 설정
-                this.updateOnlineStatus(true);
+                await this.updateOnlineStatus(true);
                 this.setupWebSocket();
+                // 알림 목록 로드
+                this.loadNotificationList();
         } else {
             localStorage.removeItem('token');
                 this.user = null;
@@ -88,8 +93,9 @@ class NavBar {
 
             if (response.ok) {
                 const data = await response.json();
-                console.log('📊 미읽은 알림 수:', data.unreadCount);
-                this.updateNotificationBadge(data.unreadCount);
+                const unreadCount = data.unreadCount || 0;
+                console.log('📊 미읽은 알림 수:', unreadCount, '타입:', typeof unreadCount);
+                this.updateNotificationBadge(unreadCount);
             } else {
                 console.error('알림 상태 조회 실패:', response.status);
             }
@@ -106,11 +112,14 @@ class NavBar {
         console.log('🔔 알림 배지 업데이트:', count, 'badge:', badge, 'icon:', icon);
         
         if (badge && icon) {
-            if (count > 0) {
-                badge.textContent = count > 99 ? '99+' : count;
+            // count가 숫자가 아닌 경우 숫자로 변환
+            const badgeCount = typeof count === 'number' ? count : parseInt(count) || 0;
+            
+            if (badgeCount > 0) {
+                badge.textContent = badgeCount > 99 ? '99+' : badgeCount.toString();
                 badge.classList.remove('d-none');
                 icon.classList.add('text-warning'); // 알림이 있을 때 노란색
-                console.log('✅ 알림 배지 표시:', count);
+                console.log('✅ 알림 배지 표시:', badgeCount);
             } else {
                 badge.classList.add('d-none');
                 icon.classList.remove('text-warning');
@@ -119,6 +128,181 @@ class NavBar {
         } else {
             console.warn('⚠️ 알림 배지 또는 아이콘을 찾을 수 없습니다.');
         }
+        
+        // 알림 목록도 업데이트 (비동기이지만 await 없이 호출)
+        this.loadNotificationList();
+    }
+    
+    // 채팅방의 메시지 알림 읽음 처리
+    async markChatRoomNotificationsAsRead(roomId) {
+        try {
+            const response = await fetch(`/api/notifications/read-chat-room/${roomId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            
+            if (response.ok) {
+                console.log(`✅ 채팅방 ${roomId}의 알림을 읽음 처리했습니다.`);
+            }
+        } catch (error) {
+            console.error('채팅방 알림 읽음 처리 실패:', error);
+        }
+    }
+
+    // 알림 목록 로드
+    async loadNotificationList() {
+        if (!this.user) return;
+        
+        try {
+            const response = await fetch('/api/notifications?limit=10', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.renderNotificationList(data.notifications || []);
+            }
+        } catch (error) {
+            console.error('알림 목록 로드 실패:', error);
+        }
+    }
+    
+    // 알림 목록 렌더링
+    renderNotificationList(notifications) {
+        const container = document.getElementById('notificationListContainer');
+        if (!container) return;
+        
+        if (notifications.length === 0) {
+            container.innerHTML = '<div class="text-center p-3 text-muted">알림이 없습니다</div>';
+            return;
+        }
+        
+        let html = '';
+        notifications.forEach(notification => {
+            let notificationData = null;
+            try {
+                notificationData = JSON.parse(notification.message);
+            } catch (e) {
+                notificationData = { message: notification.message };
+            }
+            
+            const isMessage = notification.type === 'message';
+            const isComment = notification.type === 'comment';
+            const messageCount = notificationData.messageCount || 1;
+            const timeAgo = this.getTimeAgo(new Date(notification.created_at));
+            
+            // 메시지 알림의 경우 펼침/접힘 기능 추가
+            if (isMessage && messageCount > 1) {
+                const messages = notificationData.messages || [];
+                html += `
+                    <li class="notification-item ${!notification.is_read ? 'bg-light' : ''}" data-notification-id="${notification.id}">
+                        <div class="px-3 py-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center mb-1">
+                                        <i class="fas fa-envelope me-2 text-primary"></i>
+                                        <strong>${notification.title}</strong>
+                                        ${!notification.is_read ? '<span class="badge bg-danger ms-2">NEW</span>' : ''}
+                                    </div>
+                                    <p class="mb-1 small">${notificationData.lastMessage || notificationData.message || ''}</p>
+                                    <small class="text-muted">${timeAgo}</small>
+                                </div>
+                                <button class="btn btn-sm btn-link p-0 ms-2" onclick="event.stopPropagation(); this.closest('.notification-item').querySelector('.message-details').classList.toggle('d-none'); this.querySelector('i').classList.toggle('fa-chevron-down'); this.querySelector('i').classList.toggle('fa-chevron-up');">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                            </div>
+                            <div class="message-details d-none mt-2 border-top pt-2">
+                                <small class="text-muted d-block mb-2">${messageCount}개의 메시지</small>
+                                ${messages.length > 0 ? messages.map(msg => `<div class="small mb-1">${msg}</div>`).join('') : ''}
+                            </div>
+                        </div>
+                    </li>
+                `;
+            } else {
+                html += `
+                    <li class="notification-item ${!notification.is_read ? 'bg-light' : ''}" data-notification-id="${notification.id}">
+                        <div class="px-3 py-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center mb-1">
+                                        <i class="fas fa-${isMessage ? 'envelope' : isComment ? 'comment' : 'bell'} me-2 text-${isMessage ? 'primary' : isComment ? 'info' : 'warning'}"></i>
+                                        <strong>${notification.title}</strong>
+                                        ${!notification.is_read ? '<span class="badge bg-danger ms-2">NEW</span>' : ''}
+                                    </div>
+                                    <p class="mb-1 small">${notificationData.message || ''}</p>
+                                    <small class="text-muted">${timeAgo}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                `;
+            }
+        });
+        
+        container.innerHTML = html;
+        
+        // 알림 클릭 이벤트 추가
+        container.querySelectorAll('.notification-item').forEach(item => {
+            item.style.cursor = 'pointer';
+            item.addEventListener('click', (e) => {
+                if (e.target.closest('button')) return;
+                const notificationId = item.dataset.notificationId;
+                const notification = notifications.find(n => n.id == notificationId);
+                if (notification) {
+                    this.handleNotificationClick(notification);
+                }
+            });
+        });
+    }
+    
+    // 알림 클릭 처리
+    handleNotificationClick(notification) {
+        let notificationData = null;
+        try {
+            notificationData = JSON.parse(notification.message);
+        } catch (e) {
+            notificationData = { message: notification.message };
+        }
+        
+        // 읽음 처리
+        if (!notification.is_read) {
+            fetch(`/api/notifications/${notification.id}/read`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            }).then(() => {
+                this.checkNotificationStatus();
+                this.loadNotificationList();
+            });
+        }
+        
+        // 알림 타입에 따라 이동
+        if (notification.type === 'message' && notificationData.roomId) {
+            // 알림 설정 페이지와 동일하게 roomId 파라미터 사용
+            window.location.href = `/chat?roomId=${notificationData.roomId}`;
+        } else if (notification.type === 'comment' && notificationData.postId) {
+            window.location.href = `/posts/${notificationData.postId}`;
+        }
+    }
+    
+    // 시간 표시 (예: "5분 전")
+    getTimeAgo(date) {
+        const now = new Date();
+        const diff = now - date;
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+        
+        if (minutes < 1) return '방금 전';
+        if (minutes < 60) return `${minutes}분 전`;
+        if (hours < 24) return `${hours}시간 전`;
+        if (days < 7) return `${days}일 전`;
+        return date.toLocaleDateString('ko-KR');
     }
 
     // 온라인 상태 업데이트
@@ -178,6 +362,13 @@ class NavBar {
                         // 알림 처리
                         this.handleNotification(message.notification);
                         break;
+                    case 'chat_message':
+                        console.log('💬 채팅 메시지 수신:', message);
+                        // 채팅 메시지 처리 (전역 이벤트 발생)
+                        window.dispatchEvent(new CustomEvent('chatMessageReceived', {
+                            detail: message
+                        }));
+                        break;
                     case 'auth_success':
                         console.log('✅ NavBar WebSocket 인증 성공');
                         break;
@@ -228,6 +419,23 @@ class NavBar {
     async handleNotification(notification) {
         console.log('📬 알림 처리 시작:', notification);
         
+        // 메시지 알림이고 현재 채팅 페이지에 해당 채팅방이 열려있으면 알림 표시하지 않음
+        if (notification.type === 'message' && notification.roomId) {
+            const currentPath = window.location.pathname;
+            if (currentPath === '/chat') {
+                // 전역 변수에서 현재 채팅방 ID 확인
+                if (typeof window.currentChatRoomId !== 'undefined' && window.currentChatRoomId === notification.roomId) {
+                    console.log('💬 채팅 중이므로 알림 표시하지 않음:', notification.roomId);
+                    // 해당 채팅방의 알림을 읽음 처리
+                    await this.markChatRoomNotificationsAsRead(notification.roomId);
+                    // 배지와 목록만 업데이트 (토스트 팝업은 표시하지 않음)
+                    await this.checkNotificationStatus();
+                    await this.loadNotificationList();
+                    return;
+                }
+            }
+        }
+        
         // 알림 타입에 따른 설정 확인
         try {
             const response = await fetch('/api/notifications/settings', {
@@ -265,8 +473,14 @@ class NavBar {
             // 에러 발생 시에도 알림 표시 (기본 동작)
         }
         
-        // 알림 배지 업데이트
+        // 알림 배지 업데이트 (서버에서 최신 개수 가져오기)
         await this.checkNotificationStatus();
+        
+        // 알림 목록도 업데이트
+        await this.loadNotificationList();
+        
+        // 토스트 팝업 표시
+        this.showNotificationToast(notification);
         
         // 브라우저 알림 표시
         if (Notification.permission === 'granted') {
@@ -288,6 +502,63 @@ class NavBar {
         window.dispatchEvent(new CustomEvent('newNotification', {
             detail: notification
         }));
+    }
+    
+    // 토스트 팝업 표시
+    showNotificationToast(notification) {
+        const toastContainer = this.getOrCreateToastContainer();
+        const SINGLE_TOAST_ID = 'singleNotificationToast';
+        
+        // 기존 토스트가 있으면 제거
+        const existingToast = document.getElementById(SINGLE_TOAST_ID);
+        if (existingToast) {
+            const existingBootstrapToast = bootstrap.Toast.getInstance(existingToast);
+            if (existingBootstrapToast) {
+                existingBootstrapToast.hide();
+            }
+            existingToast.remove();
+        }
+        
+        const icon = notification.type === 'message' ? 'envelope' : notification.type === 'comment' ? 'comment' : 'bell';
+        const bgColor = notification.type === 'message' ? 'primary' : notification.type === 'comment' ? 'info' : 'warning';
+        const title = notification.type === 'message' ? '새 메시지' : notification.type === 'comment' ? '새 댓글' : '알림';
+        
+        const toastHTML = `
+            <div id="${SINGLE_TOAST_ID}" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+                <div class="toast-header bg-${bgColor} text-white">
+                    <i class="fas fa-${icon} me-2"></i>
+                    <strong class="me-auto">${title}</strong>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div class="toast-body">
+                    ${notification.message || notification.title}
+                </div>
+            </div>
+        `;
+        
+        toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+        
+        const toastElement = document.getElementById(SINGLE_TOAST_ID);
+        const toast = new bootstrap.Toast(toastElement);
+        toast.show();
+        
+        // 토스트가 숨겨지면 DOM에서 제거
+        toastElement.addEventListener('hidden.bs.toast', function() {
+            this.remove();
+        });
+    }
+    
+    // 토스트 컨테이너 가져오기 또는 생성
+    getOrCreateToastContainer() {
+        let container = document.getElementById('toastContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toastContainer';
+            container.className = 'toast-container position-fixed top-0 end-0 p-3';
+            container.style.zIndex = '9999';
+            document.body.appendChild(container);
+        }
+        return container;
     }
 
     // GNB HTML 생성
@@ -370,13 +641,25 @@ class NavBar {
                         </a></li>
                     </ul>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link position-relative" href="/notifications" id="notificationIcon">
+                <li class="nav-item dropdown">
+                    <a class="nav-link position-relative dropdown-toggle" href="#" role="button" id="notificationIcon" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="fas fa-bell"></i>
                         <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="notificationBadge">
                             0
                         </span>
                     </a>
+                    <ul class="dropdown-menu dropdown-menu-end" id="notificationDropdown" style="min-width: 350px; max-height: 500px; overflow-y: auto;">
+                        <li><h6 class="dropdown-header">
+                            <i class="fas fa-bell me-2"></i>알림
+                            <a href="/notifications" class="float-end text-decoration-none small">전체 보기</a>
+                        </h6></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li id="notificationListContainer">
+                            <div class="text-center p-3 text-muted">
+                                <i class="fas fa-spinner fa-spin"></i> 로딩 중...
+                            </div>
+                        </li>
+                    </ul>
                 </li>
             </ul>
         `;

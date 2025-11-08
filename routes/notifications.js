@@ -10,14 +10,32 @@ router.get('/unread-count', auth.authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
         
-        const [result] = await pool.query(
-            'SELECT COUNT(*) as unreadCount FROM notifications WHERE user_id = ? AND read_status = 0',
+        // 미읽은 알림 목록 조회
+        const [notifications] = await pool.query(
+            'SELECT message FROM notifications WHERE user_id = ? AND read_status = 0',
             [userId]
         );
 
+        // 메시지 타입 알림의 경우 messageCount를 합산
+        let totalCount = 0;
+        notifications.forEach(notification => {
+            try {
+                const messageData = JSON.parse(notification.message);
+                // 메시지 타입 알림이고 messageCount가 있으면 그 값을 사용, 없으면 1
+                if (messageData.messageCount) {
+                    totalCount += messageData.messageCount;
+                } else {
+                    totalCount += 1;
+                }
+            } catch (e) {
+                // JSON 파싱 실패 시 일반 알림으로 간주하여 1 추가
+                totalCount += 1;
+            }
+        });
+
         res.json({
             success: true,
-            unreadCount: result[0].unreadCount
+            unreadCount: totalCount
         });
     } catch (error) {
         console.error('미읽은 알림 수 조회 오류:', error);
@@ -42,9 +60,24 @@ router.get('/', auth.authenticateToken, async (req, res) => {
             [userId]
         );
 
+        // 메시지 타입 알림의 경우 메시지 개수 표시를 위해 title 업데이트
+        const processedNotifications = notifications.map(notification => {
+            if (notification.type === 'message') {
+                try {
+                    const messageData = JSON.parse(notification.message);
+                    if (messageData.messageCount && messageData.messageCount > 1) {
+                        notification.title = `새 메시지 (${messageData.messageCount}개)`;
+                    }
+                } catch (e) {
+                    // JSON 파싱 실패 시 원본 유지
+                }
+            }
+            return notification;
+        });
+
         res.json({
             success: true,
-            notifications
+            notifications: processedNotifications
         });
     } catch (error) {
         console.error('알림 조회 오류:', error);
@@ -197,6 +230,36 @@ router.put('/read-all', auth.authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('모든 알림 읽음 처리 오류:', error);
+        res.status(500).json({
+            success: false,
+            message: '서버 오류가 발생했습니다.'
+        });
+    }
+});
+
+// 특정 채팅방의 메시지 알림 읽음 처리
+router.put('/read-chat-room/:roomId', auth.authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { roomId } = req.params;
+
+        // 해당 채팅방의 모든 읽지 않은 메시지 알림을 읽음 처리
+        await pool.query(
+            `UPDATE notifications 
+             SET read_status = 1 
+             WHERE user_id = ? 
+             AND type = 'message' 
+             AND read_status = 0 
+             AND JSON_EXTRACT(message, '$.roomId') = ?`,
+            [userId, parseInt(roomId)]
+        );
+
+        res.json({
+            success: true,
+            message: '채팅방 알림이 읽음 처리되었습니다.'
+        });
+    } catch (error) {
+        console.error('채팅방 알림 읽음 처리 오류:', error);
         res.status(500).json({
             success: false,
             message: '서버 오류가 발생했습니다.'

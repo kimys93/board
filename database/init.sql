@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS attachments (
 -- 채팅 메시지 테이블
 CREATE TABLE IF NOT EXISTS chat_messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    room_id INT NOT NULL,
     user_id INT NOT NULL,
     username VARCHAR(50) NOT NULL,
     content TEXT NOT NULL,
@@ -67,6 +68,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     file_path VARCHAR(500) NULL,
     file_name VARCHAR(255) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
