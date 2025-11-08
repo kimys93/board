@@ -68,6 +68,8 @@ services:
       - board_network
     # Docker 소켓 권한 문제 해결을 위해 privileged 모드 사용
     privileged: true
+    # Windows 환경에서 Docker 소켓 접근을 위해 user를 root로 설정
+    user: root
 
 volumes:
   db_data:
