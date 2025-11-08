@@ -47,6 +47,7 @@ Node.js, Express, MySQL을 사용한 테스트 자동화 코드 연습을 위한
 - **WebSocket (ws)** - 실시간 통신
 - **Multer** - 파일 업로드 처리
 - **JWT** - 인증 토큰
+- **cookie-parser** - 쿠키 기반 세션 관리
 
 ### Frontend
 - **HTML5/CSS3/JavaScript** - 기본 웹 기술
@@ -335,7 +336,7 @@ docker exec -it board_db mysql -u board_user -p board_db
 
 #### 인증 방식
 - **HTTP Basic Authentication**: 브라우저 기본 인증 다이얼로그 사용
-- **쿠키 기반 세션**: 인증 성공 후 24시간 동안 쿠키로 세션 유지
+- **쿠키 기반 세션**: 인증 성공 후 24시간 동안 쿠키로 세션 유지 (cookie-parser 사용)
 - **네트워크 무관**: WiFi와 모바일 데이터 모두에서 동일하게 작동 (단, 로컬 네트워크 접속 제한은 유지)
 
 > ⚠️ **보안 주의사항**:
@@ -355,8 +356,8 @@ docker exec -it board_db mysql -u board_user -p board_db
 
 ### v2.1
 - ✅ HTTP Basic Authentication 추가 (모든 IP 허용)
+- ✅ 쿠키 기반 세션 관리 추가 (cookie-parser) - 모바일 네트워크 호환성 개선
 - ✅ IP 필터링 제거 (외부 접속 완전 허용)
-- ✅ 불필요한 라이브러리 제거 (cookie-parser, jest)
 - ✅ 코드 정리 및 최적화
 
 ### v2.0
