@@ -10,12 +10,7 @@ pipeline {
     }
     
     stages {
-        stage('Checkout') {
-            steps {
-                echo '📥 GitHub에서 코드 체크아웃 중...'
-                checkout scm
-            }
-        }
+        // Checkout은 Jenkins가 자동으로 수행하므로 별도 stage 불필요
         
         stage('Setup') {
             steps {
