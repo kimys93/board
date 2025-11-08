@@ -47,7 +47,9 @@ services:
 
   # Jenkins CI/CD
   jenkins:
-    image: jenkins/jenkins:lts
+    build:
+      context: .
+      dockerfile: Dockerfile.jenkins
     container_name: board_jenkins
     restart: always
     ports:
