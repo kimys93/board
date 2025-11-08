@@ -6,6 +6,9 @@ const WebSocket = require('ws');
 const http = require('http');
 require('dotenv').config();
 
+// 사이트 접속 인증 미들웨어 가져오기
+const { siteAuth } = require('./middleware/siteAuth');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -27,6 +30,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/static', express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// 사이트 접속 인증 미들웨어 적용 (HTTP Basic Authentication)
+app.use(siteAuth);
+console.log('🔒 HTTP Basic Authentication이 활성화되었습니다.');
 
 // 라우트 설정
 app.use('/api/auth', require('./routes/auth'));
@@ -131,7 +138,11 @@ const clients = new Map();
 
 // WebSocket 연결 처리
 wss.on('connection', (ws, req) => {
-    console.log('새로운 WebSocket 연결');
+    // 간단한 IP 추출 (로깅용)
+    const clientIP = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
+                     req.socket?.remoteAddress || 
+                     'unknown';
+    console.log(`🔌 새로운 WebSocket 연결: ${clientIP}`);
     
     let userId = null;
     let username = null;
@@ -373,6 +384,6 @@ async function saveMessage(messageData) {
 app.set('broadcastUserStatusChange', broadcastUserStatusChange);
 app.set('broadcastNotification', broadcastNotification);
 
-server.listen(PORT, () => {
-    console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`서버가 포트 ${PORT}에서 실행 중입니다. (0.0.0.0:${PORT})`);
 });

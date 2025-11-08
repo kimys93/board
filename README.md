@@ -6,6 +6,7 @@ Node.js, Express, MySQL을 사용한 테스트 자동화 코드 연습을 위한
 ## 🚀 주요 기능
 
 ### 인증 및 사용자 관리
+- **사이트 접속 인증** - HTTP Basic Authentication (모든 IP 허용)
 - **회원가입 및 로그인** - JWT 기반 인증
 - **프로필 관리** - 사용자 정보 수정, 프로필 이미지 업로드
 - **비밀번호 변경** - 보안을 위한 비밀번호 변경 기능
@@ -74,7 +75,8 @@ board/
 ├── config/
 │   └── database.js        # 데이터베이스 설정
 ├── middleware/
-│   └── auth.js           # 인증 미들웨어
+│   ├── auth.js           # JWT 인증 미들웨어
+│   └── siteAuth.js       # 사이트 접속 인증 (HTTP Basic Auth)
 ├── routes/               # API 라우트
 │   ├── auth.js          # 인증 관련 (회원가입, 로그인, 프로필)
 │   ├── posts.js         # 게시글 관련
@@ -128,8 +130,17 @@ docker-compose logs -f
 ### 4. 개별 서비스 접속
 
 - **웹 애플리케이션**: http://localhost:3000
+  - 접속 시 HTTP Basic Authentication 다이얼로그 표시
+  - ID: `kimys`, 비밀번호: `L0veyUsung!@`
 - **Jenkins**: http://localhost:8080
 - **MySQL**: localhost:3306
+
+### 5. 외부 접속
+
+서버는 모든 IP에서 접속 가능합니다. 외부에서 접속하려면:
+- 서버 IP 주소 확인: `ipconfig` (Windows) 또는 `ifconfig` (Linux/Mac)
+- 브라우저에서 `http://서버IP:3000` 접속
+- HTTP Basic Authentication 다이얼로그에서 ID/PW 입력
 
 ## 🔧 개발 환경 설정
 
@@ -250,14 +261,29 @@ docker exec -it board_db mysql -u board_user -p board_db
 
 ## 🔐 인증 및 보안
 
+- **HTTP Basic Authentication** - 사이트 접속 시 ID/PW 인증 (모든 IP 허용)
 - **JWT 토큰** - 24시간 유효 기간
 - **비밀번호 해싱** - bcryptjs 사용
 - **입력 검증** - express-validator 사용
 - **파일 업로드 제한** - 이미지 파일만 허용 (최대 10MB)
 
+### 사이트 접속 인증
+
+사이트 접속 시 브라우저 기본 인증 다이얼로그가 표시됩니다.
+- **ID**: `kimys`
+- **비밀번호**: `L0veyUsung!@`
+
+> ⚠️ 프로덕션 환경에서는 반드시 비밀번호를 변경하세요.
+
 ## 🎯 주요 업데이트 내역
 
-### v2.0 (최신)
+### v2.1 (최신)
+- ✅ HTTP Basic Authentication 추가 (모든 IP 허용)
+- ✅ IP 필터링 제거 (외부 접속 완전 허용)
+- ✅ 불필요한 라이브러리 제거 (cookie-parser, jest)
+- ✅ 코드 정리 및 최적화
+
+### v2.0
 - ✅ 실시간 채팅 기능 추가
 - ✅ 브라우저 알림 시스템 구현
 - ✅ 프로필 이미지 업로드 기능
