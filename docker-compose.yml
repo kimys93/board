@@ -50,6 +50,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.jenkins
+      args:
+        # 호스트의 docker 그룹 GID를 확인하여 설정 (기본값: 999)
+        # Windows에서는 보통 999를 사용
+        DOCKER_GID: 999
     container_name: board_jenkins
     restart: always
     ports:
@@ -62,6 +66,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - board_network
+    # Docker 소켓 권한 문제 해결을 위해 privileged 모드 사용
+    privileged: true
 
 volumes:
   db_data:

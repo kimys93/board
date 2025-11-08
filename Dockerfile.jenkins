@@ -7,8 +7,10 @@ RUN curl -L "https://github.com/docker/compose/releases/latest/download/docker-c
     chmod +x /usr/local/bin/docker-compose && \
     docker-compose --version
 
-# jenkins 사용자를 docker 그룹에 추가 (Docker 소켓 접근 권한)
-RUN groupadd -f docker && \
+# Docker 소켓 접근을 위한 docker 그룹 생성 (GID는 런타임에 설정)
+# 호스트의 docker 그룹 GID와 일치시켜야 함
+ARG DOCKER_GID=999
+RUN groupadd -g ${DOCKER_GID} docker || true && \
     usermod -aG docker jenkins
 
 USER jenkins
