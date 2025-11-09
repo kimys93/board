@@ -146,7 +146,7 @@ pipeline {
         }
         
         stage('Deploy') {
-            // when 조건 제거: 모든 빌드에서 서버 시작
+            // 모든 빌드에서 서버 시작 (docker-compose 사용)
             steps {
                 echo '🚀 서버 배포 중...'
                 script {
@@ -155,57 +155,8 @@ pipeline {
                         docker stop board_web board_db 2>/dev/null || true
                         docker rm -f board_web board_db 2>/dev/null || true
                         
-                        # 네트워크 생성 (이미 있으면 무시)
-                        docker network create board_network 2>/dev/null || true
-                        
-                        # DB 컨테이너 시작
-                        docker run -d \\
-                            --name board_db \\
-                            --restart always \\
-                            --network board_network \\
-                            -p 3306:3306 \\
-                            -v board_db_data:/var/lib/mysql \\
-                            -v \$(pwd)/database/init.sql:/docker-entrypoint-initdb.d/init.sql \\
-                            -e MYSQL_ROOT_PASSWORD=rootpassword \\
-                            -e MYSQL_DATABASE=board_db \\
-                            -e MYSQL_USER=board_user \\
-                            -e MYSQL_PASSWORD=board_password \\
-                            mysql:8.0 \\
-                            --character-set-server=utf8mb4 \\
-                            --collation-server=utf8mb4_unicode_ci
-                        
-                        # DB 초기화 대기
-                        sleep 10
-                        timeout 60 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || exit 1
-                        
-                        # siteAuth.credentials 파일 확인
-                        if [ ! -f siteAuth.credentials ]; then
-                            echo "❌ siteAuth.credentials 파일이 없습니다."
-                            exit 1
-                        fi
-                        
-                        # Web 컨테이너 시작
-                        docker run -d \\
-                            --name board_web \\
-                            --restart always \\
-                            --network board_network \\
-                            -p 0.0.0.0:3000:3000 \\
-                            -v \$(pwd)/uploads:/app/uploads \\
-                            -v \$(pwd)/public:/app/public \\
-                            -v \$(pwd)/routes:/app/routes \\
-                            -v \$(pwd)/config:/app/config \\
-                            -v \$(pwd)/middleware:/app/middleware \\
-                            -v \$(pwd)/server.js:/app/server.js \\
-                            -e NODE_ENV=development \\
-                            -e DB_HOST=board_db \\
-                            -e DB_USER=board_user \\
-                            -e DB_PASSWORD=board_password \\
-                            -e DB_NAME=board_db \\
-                            -e JWT_SECRET=your_jwt_secret_key_here \\
-                            board-web:latest
-                        
-                        # siteAuth.credentials 파일을 컨테이너에 복사
-                        docker cp siteAuth.credentials board_web:/app/siteAuth.credentials
+                        # docker-compose로 서버 시작 (jenkins 서비스는 제외)
+                        docker-compose up -d db web
                         
                         echo '✅ 서버가 배포되었습니다!'
                         echo '🌐 접속 주소: http://localhost:3000'
