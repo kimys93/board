@@ -177,7 +177,32 @@ pipeline {
                         
                         # docker 컨테이너 실행 (web, db만)
                         # init.sql은 docker-compose.yml의 볼륨 마운트로 자동 실행됨
-                        docker compose up -d web db
+                        # DB를 먼저 시작하여 초기화 완료 대기
+                        docker compose up -d db
+                        
+                        # DB 초기화 완료 대기 (healthcheck 활용)
+                        echo "⏳ DB 초기화 대기 중..."
+                        sleep 10
+                        timeout 120 bash -c 'until docker exec board_db mysqladmin ping -h localhost -u root -prootpassword --silent; do sleep 2; done' || {
+                            echo "❌ DB 시작 실패. 로그 확인:"
+                            docker logs board_db --tail 50
+                            exit 1
+                        }
+                        
+                        # DB 테이블 확인
+                        echo "📊 DB 테이블 확인 중..."
+                        TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
+                        if [ "\$TABLE_COUNT" -lt 2 ]; then
+                            echo "⚠️ DB 테이블이 생성되지 않았습니다. (테이블 수: \$TABLE_COUNT)"
+                            echo "📋 MySQL 로그 확인:"
+                            docker logs board_db --tail 50
+                            exit 1
+                        else
+                            echo "✅ DB 테이블이 정상적으로 생성되었습니다. (테이블 수: \$TABLE_COUNT)"
+                        fi
+                        
+                        # Web 서버 시작
+                        docker compose up -d web
                         
                         # siteAuth.credentials 파일을 컨테이너에 복사
                         sleep 3
