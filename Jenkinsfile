@@ -2,7 +2,6 @@ pipeline {
     agent any
     
     environment {
-        DOCKER_COMPOSE = 'docker-compose'
         PROJECT_NAME = 'board'
         // Jenkins Credentials 사용 (보안)
         SITE_ID = credentials('site-auth-id')
@@ -40,7 +39,11 @@ pipeline {
                 echo '🔨 Docker 이미지 빌드 중...'
                 script {
                     sh """
-                        ${DOCKER_COMPOSE} build web
+                        # 네트워크 생성 (이미 있으면 무시)
+                        docker network create board_network 2>/dev/null || true
+                        
+                        # 웹 이미지 빌드
+                        docker build -t board-web:latest .
                     """
                 }
             }
@@ -51,16 +54,65 @@ pipeline {
                 echo '🧪 테스트 실행 중...'
                 script {
                     try {
-                        // 서비스 시작
+                        // 기존 컨테이너 정리 (jenkins는 절대 건드리지 않음)
                         sh """
-                            ${DOCKER_COMPOSE} up -d db
+                            docker stop board_web board_db 2>/dev/null || true
+                            docker rm -f board_web board_db 2>/dev/null || true
+                        """
+                        
+                        // 네트워크 생성 (이미 있으면 무시)
+                        sh """
+                            docker network create board_network 2>/dev/null || true
+                        """
+                        
+                        // DB 컨테이너 시작 (테스트용이므로 restart 정책 없음)
+                        sh """
+                            docker run -d \\
+                                --name board_db \\
+                                --network board_network \\
+                                -p 3306:3306 \\
+                                -v board_db_data:/var/lib/mysql \\
+                                -v \$(pwd)/database/init.sql:/docker-entrypoint-initdb.d/init.sql \\
+                                -e MYSQL_ROOT_PASSWORD=rootpassword \\
+                                -e MYSQL_DATABASE=board_db \\
+                                -e MYSQL_USER=board_user \\
+                                -e MYSQL_PASSWORD=board_password \\
+                                mysql:8.0 \\
+                                --character-set-server=utf8mb4 \\
+                                --collation-server=utf8mb4_unicode_ci
+                        """
+                        
+                        // DB 초기화 대기
+                        sh """
                             sleep 10
-                            ${DOCKER_COMPOSE} up -d web
-                            sleep 5
+                            timeout 60 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || exit 1
+                        """
+                        
+                        // Web 컨테이너 시작 (테스트용이므로 restart 정책 없음)
+                        sh """
+                            docker run -d \\
+                                --name board_web \\
+                                --network board_network \\
+                                -p 0.0.0.0:3000:3000 \\
+                                -v \$(pwd)/uploads:/app/uploads \\
+                                -v \$(pwd)/public:/app/public \\
+                                -v \$(pwd)/routes:/app/routes \\
+                                -v \$(pwd)/config:/app/config \\
+                                -v \$(pwd)/middleware:/app/middleware \\
+                                -v \$(pwd)/server.js:/app/server.js \\
+                                -v \$(pwd)/siteAuth.credentials:/app/siteAuth.credentials \\
+                                -e NODE_ENV=development \\
+                                -e DB_HOST=board_db \\
+                                -e DB_USER=board_user \\
+                                -e DB_PASSWORD=board_password \\
+                                -e DB_NAME=board_db \\
+                                -e JWT_SECRET=your_jwt_secret_key_here \\
+                                board-web:latest
                         """
                         
                         // 서버가 정상적으로 시작되었는지 확인
                         sh """
+                            sleep 5
                             timeout 30 bash -c 'until curl -f http://localhost:3000 || exit 1; do sleep 2; done' || exit 1
                         """
                         
@@ -69,9 +121,10 @@ pipeline {
                         echo "❌ 테스트 실패: ${e.getMessage()}"
                         throw e
                     } finally {
-                        // 테스트 후 정리
+                        // 테스트 후 정리 (jenkins는 절대 건드리지 않음)
                         sh """
-                            ${DOCKER_COMPOSE} down || true
+                            docker stop board_web board_db 2>/dev/null || true
+                            docker rm -f board_web board_db 2>/dev/null || true
                         """
                     }
                 }
@@ -86,8 +139,56 @@ pipeline {
                 echo '🚀 배포 중...'
                 script {
                     sh """
-                        ${DOCKER_COMPOSE} down || true
-                        ${DOCKER_COMPOSE} up -d --build
+                        # 웹 이미지 재빌드
+                        docker build -t board-web:latest .
+                        
+                        # 기존 컨테이너 정리 (jenkins는 절대 건드리지 않음)
+                        docker stop board_web board_db 2>/dev/null || true
+                        docker rm -f board_web board_db 2>/dev/null || true
+                        
+                        # 네트워크 생성 (이미 있으면 무시)
+                        docker network create board_network 2>/dev/null || true
+                        
+                        # DB 컨테이너 시작
+                        docker run -d \\
+                            --name board_db \\
+                            --restart always \\
+                            --network board_network \\
+                            -p 3306:3306 \\
+                            -v board_db_data:/var/lib/mysql \\
+                            -v \$(pwd)/database/init.sql:/docker-entrypoint-initdb.d/init.sql \\
+                            -e MYSQL_ROOT_PASSWORD=rootpassword \\
+                            -e MYSQL_DATABASE=board_db \\
+                            -e MYSQL_USER=board_user \\
+                            -e MYSQL_PASSWORD=board_password \\
+                            mysql:8.0 \\
+                            --character-set-server=utf8mb4 \\
+                            --collation-server=utf8mb4_unicode_ci
+                        
+                        # DB 초기화 대기
+                        sleep 10
+                        timeout 60 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || exit 1
+                        
+                        # Web 컨테이너 시작
+                        docker run -d \\
+                            --name board_web \\
+                            --restart always \\
+                            --network board_network \\
+                            -p 0.0.0.0:3000:3000 \\
+                            -v \$(pwd)/uploads:/app/uploads \\
+                            -v \$(pwd)/public:/app/public \\
+                            -v \$(pwd)/routes:/app/routes \\
+                            -v \$(pwd)/config:/app/config \\
+                            -v \$(pwd)/middleware:/app/middleware \\
+                            -v \$(pwd)/server.js:/app/server.js \\
+                            -v \$(pwd)/siteAuth.credentials:/app/siteAuth.credentials \\
+                            -e NODE_ENV=development \\
+                            -e DB_HOST=board_db \\
+                            -e DB_USER=board_user \\
+                            -e DB_PASSWORD=board_password \\
+                            -e DB_NAME=board_db \\
+                            -e JWT_SECRET=your_jwt_secret_key_here \\
+                            board-web:latest
                     """
                 }
             }
@@ -98,9 +199,10 @@ pipeline {
         always {
             echo '🧹 정리 중...'
             script {
-                // 실패한 경우에도 로그 확인
+                // 실패한 경우에도 로그 확인 (jenkins는 제외)
                 sh """
-                    ${DOCKER_COMPOSE} logs --tail=50 || true
+                    docker logs --tail=50 board_web 2>/dev/null || true
+                    docker logs --tail=50 board_db 2>/dev/null || true
                 """
             }
         }
