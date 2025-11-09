@@ -216,11 +216,33 @@ pipeline {
                             sleep 10
                             timeout 60 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || exit 1
                             
-                            # Web 서버 시작
-                            docker-compose up -d web || {
+                            # Web 서버 시작 (docker-compose 대신 docker run 사용, DB는 이미 실행 중)
+                            docker run -d \\
+                                --name board_web \\
+                                --network board_network \\
+                                -p 0.0.0.0:3000:3000 \\
+                                -v \$(pwd)/uploads:/app/uploads \\
+                                -e NODE_ENV=development \\
+                                -e DB_HOST=board_db \\
+                                -e DB_USER=board_user \\
+                                -e DB_PASSWORD=board_password \\
+                                -e DB_NAME=board_db \\
+                                -e JWT_SECRET=your_jwt_secret_key_here \\
+                                board-web:latest || {
                                 echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
                                 sleep 5
-                                docker-compose up -d web
+                                docker run -d \\
+                                    --name board_web \\
+                                    --network board_network \\
+                                    -p 0.0.0.0:3000:3000 \\
+                                    -v \$(pwd)/uploads:/app/uploads \\
+                                    -e NODE_ENV=development \\
+                                    -e DB_HOST=board_db \\
+                                    -e DB_USER=board_user \\
+                                    -e DB_PASSWORD=board_password \\
+                                    -e DB_NAME=board_db \\
+                                    -e JWT_SECRET=your_jwt_secret_key_here \\
+                                    board-web:latest
                             }
                             
                             # siteAuth.credentials 파일을 컨테이너에 복사
