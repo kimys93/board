@@ -9,8 +9,8 @@ services:
       MYSQL_DATABASE: board_db
       MYSQL_USER: board_user
       MYSQL_PASSWORD: board_password
-    ports:
-      - "3306:3306"
+    # ports:
+      # - "3306:3306"  # Windows 포트 권한 문제로 호스트 포트 바인딩 제거 (컨테이너 간 통신만 사용)
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     volumes:
       - db_data:/var/lib/mysql
