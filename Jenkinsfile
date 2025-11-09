@@ -126,8 +126,8 @@ pipeline {
                             sleep 5
                             # 컨테이너가 실행 중인지 확인
                             timeout 30 bash -c 'until docker ps | grep -q board_web; do sleep 2; done' || exit 1
-                            # 컨테이너 로그에서 서버 시작 확인
-                            timeout 30 bash -c 'until docker logs board_web 2>&1 | grep -q "Server running\|listening\|started"; do sleep 2; done' || (docker logs board_web && exit 1)
+                            # 컨테이너 로그에서 서버 시작 확인 (grep 패턴을 단일 따옴표로 감싸서 이스케이프 문제 해결)
+                            timeout 30 bash -c 'until docker logs board_web 2>&1 | grep -qE "Server running|listening|started"; do sleep 2; done' || (docker logs board_web && exit 1)
                         """
                         
                         echo '✅ 서버가 정상적으로 시작되었습니다.'
