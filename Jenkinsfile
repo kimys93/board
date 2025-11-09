@@ -155,190 +155,61 @@ pipeline {
         }
         
         stage('Deploy') {
-            // 서버 상태 확인 후 선택적 배포
             steps {
                 echo '🚀 서버 배포 중...'
                 script {
-                    // reset_db 파라미터 확인
-                    if (params.reset_db) {
-                        echo '⚠️⚠️⚠️ DB 리셋 모드: 모든 데이터가 삭제됩니다! ⚠️⚠️⚠️'
-                        sh """
-                            # 모든 서버 중지 및 제거 (Jenkins는 절대 건드리지 않음)
-                            echo '🛑 서버 중지 중...'
-                            # docker-compose down은 Jenkins까지 중지하므로 사용하지 않음
-                            docker stop board_web board_db 2>/dev/null || true
-                            docker rm -f board_web board_db 2>/dev/null || true
-                            
-                            # 네트워크에서 분리 (Jenkins는 제외)
-                            docker network disconnect board_network board_web 2>/dev/null || true
-                            docker network disconnect board_network board_db 2>/dev/null || true
-                            
-                            # DB 볼륨 삭제 (데이터 초기화)
-                            echo '🗑️ DB 볼륨 삭제 중...'
-                            docker volume rm board_db_data 2>/dev/null || echo "⚠️ 볼륨이 이미 삭제되었거나 존재하지 않습니다."
-                            
-                            # 포트 해제 대기
-                            sleep 3
-                            
-                            # 서버 재시작 (docker-compose 사용, init.sql 자동 실행)
-                            echo '🔄 서버 재시작 중...'
-                            
-                            # DB 서버 시작 (docker-compose가 init.sql을 자동 실행)
-                            docker-compose up -d db || {
-                                echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
-                                sleep 5
-                                docker-compose up -d db
-                            }
-                            
-                            # DB 초기화 대기
-                            echo '⏳ DB 초기화 대기 중...'
-                            sleep 15
-                            timeout 120 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || {
-                                echo "❌ DB 시작 실패. 로그 확인:"
-                                docker logs board_db --tail 50
-                                exit 1
-                            }
-                            
-                            # 테이블이 생성되었는지 확인
-                            echo '📊 DB 테이블 확인 중...'
-                            TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
-                            if [ "\$TABLE_COUNT" -lt 2 ]; then
-                                echo "⚠️ DB 테이블이 생성되지 않았습니다. (테이블 수: \$TABLE_COUNT)"
-                                echo "📋 생성된 테이블:"
-                                docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null || true
-                                exit 1
-                            else
-                                echo "✅ DB 테이블이 정상적으로 생성되었습니다. (테이블 수: \$TABLE_COUNT)"
-                            fi
-                            
-                            # Web 서버 시작
-                            docker-compose up -d web || {
-                                echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
-                                sleep 5
-                                docker-compose up -d web
-                            }
-                            
-                            # siteAuth.credentials 파일을 컨테이너에 복사
-                            sleep 3
-                            docker cp siteAuth.credentials board_web:/app/siteAuth.credentials || echo "⚠️ siteAuth.credentials 복사 실패 (이미 존재할 수 있음)"
-                            
-                            # web 서버 재시작 (siteAuth.credentials 적용)
-                            docker restart board_web || true
-                            
-                            echo '✅ DB가 초기화되고 서버가 재시작되었습니다!'
-                            echo '🌐 접속 주소: http://localhost:3000'
-                        """
-                    } else {
-                        // 일반 배포 로직
-                        sh """
-                            # 서버가 이미 실행 중인지 확인
-                            if docker ps --format '{{.Names}}' | grep -q '^board_web\$'; then
-                            echo 'ℹ️ 서버가 이미 실행 중입니다. 빌드만 완료되었습니다.'
-                            echo '💡 새 이미지를 적용하려면 수동으로 서버를 재시작하세요:'
-                            echo '   docker restart board_web'
-                            echo '✅ 빌드 완료! (서버는 재시작하지 않음)'
+                    sh """
+                        reset_db=${params.reset_db}
+                        
+                        if [ "\$reset_db" == "true" ]; then
+                            echo "⚠️⚠️⚠️ DB 리셋 모드: 모든 데이터가 삭제됩니다! ⚠️⚠️⚠️"
+                            echo "docker 종료 및 DB 초기화"
+                            docker compose down -v
                         else
-                            echo '📦 서버가 실행 중이 아니므로 서버를 시작합니다...'
-                            
-                            # DB가 실행 중인지 확인
-                            if ! docker ps --format '{{.Names}}' | grep -q '^board_db\$'; then
-                                echo '📦 DB 서버 시작 중...'
-                                
-                                # DB 볼륨이 비어있는지 확인 (테이블이 있는지 확인)
-                                DB_VOLUME_EXISTS=\$(docker volume inspect board_db_data 2>/dev/null | grep -q "board_db_data" && echo "true" || echo "false")
-                                
-                                if [ "\$DB_VOLUME_EXISTS" = "false" ]; then
-                                    echo '📦 새로운 DB 볼륨 생성 및 초기화...'
-                                    # docker run으로 DB 생성 (init.sql 실행)
-                                    docker run -d \\
-                                        --name board_db \\
-                                        --network board_network \\
-                                        -v board_db_data:/var/lib/mysql \\
-                                        -v \$(pwd)/database/init.sql:/docker-entrypoint-initdb.d/init.sql \\
-                                        -e MYSQL_ROOT_PASSWORD=rootpassword \\
-                                        -e MYSQL_DATABASE=board_db \\
-                                        -e MYSQL_USER=board_user \\
-                                        -e MYSQL_PASSWORD=board_password \\
-                                        mysql:8.0 \\
-                                        --character-set-server=utf8mb4 \\
-                                        --collation-server=utf8mb4_unicode_ci || {
-                                        echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
-                                        sleep 5
-                                        docker run -d \\
-                                            --name board_db \\
-                                            --network board_network \\
-                                            -v board_db_data:/var/lib/mysql \\
-                                            -v \$(pwd)/database/init.sql:/docker-entrypoint-initdb.d/init.sql \\
-                                            -e MYSQL_ROOT_PASSWORD=rootpassword \\
-                                            -e MYSQL_DATABASE=board_db \\
-                                            -e MYSQL_USER=board_user \\
-                                            -e MYSQL_PASSWORD=board_password \\
-                                            mysql:8.0 \\
-                                            --character-set-server=utf8mb4 \\
-                                            --collation-server=utf8mb4_unicode_ci
-                                    }
-                                    sleep 10
-                                    timeout 60 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || exit 1
-                                else
-                                    echo '📦 기존 DB 볼륨 사용...'
-                                    # 기존 볼륨이 있으면 docker-compose 사용
-                                    docker-compose up -d db || {
-                                        echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
-                                        sleep 5
-                                        docker-compose up -d db
-                                    }
-                                    sleep 5
-                                    
-                                    # DB가 준비될 때까지 대기
-                                    timeout 60 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || exit 1
-                                    
-                                    # 테이블이 있는지 확인
-                                    TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
-                                    if [ "\$TABLE_COUNT" -lt 2 ]; then
-                                        echo '⚠️ DB 테이블이 없습니다. init.sql을 수동으로 실행합니다...'
-                                        docker exec -i board_db mysql -u board_user -pboard_password board_db < \$(pwd)/database/init.sql || {
-                                            echo "⚠️ init.sql 실행 실패, 컨테이너 내부에서 직접 실행 시도..."
-                                            docker cp \$(pwd)/database/init.sql board_db:/tmp/init.sql
-                                            docker exec board_db mysql -u board_user -pboard_password board_db < /tmp/init.sql || echo "❌ init.sql 실행 실패"
-                                        }
-                                    else
-                                        echo "✅ DB 테이블이 이미 존재합니다."
-                                    fi
-                                fi
-                            else
-                                echo 'ℹ️ DB 서버가 이미 실행 중입니다.'
-                                # 실행 중이어도 테이블이 있는지 확인
-                                TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
-                                if [ "\$TABLE_COUNT" -lt 2 ]; then
-                                    echo '⚠️ DB 테이블이 없습니다. init.sql을 수동으로 실행합니다...'
-                                    docker exec -i board_db mysql -u board_user -pboard_password board_db < \$(pwd)/database/init.sql || {
-                                        echo "⚠️ init.sql 실행 실패, 컨테이너 내부에서 직접 실행 시도..."
-                                        docker cp \$(pwd)/database/init.sql board_db:/tmp/init.sql
-                                        docker exec board_db mysql -u board_user -pboard_password board_db < /tmp/init.sql || echo "❌ init.sql 실행 실패"
-                                    }
-                                fi
-                            fi
-                            
-                            # Web 서버 시작
-                            echo '📦 Web 서버 시작 중...'
-                            docker-compose up -d web || {
-                                echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
-                                sleep 5
-                                docker-compose up -d web
-                            }
-                            
-                            # siteAuth.credentials 파일을 컨테이너에 복사
-                            sleep 3
-                            docker cp siteAuth.credentials board_web:/app/siteAuth.credentials || echo "⚠️ siteAuth.credentials 복사 실패 (이미 존재할 수 있음)"
-                            
-                            # web 서버 재시작 (siteAuth.credentials 적용)
-                            docker restart board_web || true
-                            
-                            echo '✅ 서버가 배포되었습니다!'
-                            echo '🌐 접속 주소: http://localhost:3000'
+                            echo "docker 종료"
+                            docker compose down
                         fi
-                        """
-                    }
+                        
+                        # docker 컨테이너 실행
+                        docker compose up -d
+                        
+                        # siteAuth.credentials 파일을 컨테이너에 복사
+                        sleep 3
+                        docker cp siteAuth.credentials board_web:/app/siteAuth.credentials || echo "⚠️ siteAuth.credentials 복사 실패 (이미 존재할 수 있음)"
+                        
+                        # web 서버 재시작 (siteAuth.credentials 적용)
+                        docker restart board_web || true
+                        
+                        # 서버 상태 확인
+                        echo "⏳ 서버 시작 대기 중..."
+                        sleep 5
+                        
+                        # 서버 상태 코드 확인 (최대 10회 재시도)
+                        MAX_RETRIES=10
+                        RETRY_DELAY=3
+                        STATUS="000"
+                        
+                        for i in \$(seq 1 \$MAX_RETRIES); do
+                            STATUS=\$(curl -o /dev/null -s -w "%{http_code}\\n" http://localhost:3000 || echo "000")
+                            
+                            if [ "\$STATUS" = "200" ] || [ "\$STATUS" = "401" ]; then
+                                echo "✅ 서버가 정상적으로 시작되었습니다. (상태 코드: \$STATUS)"
+                                break
+                            else
+                                echo "⏳ 서버가 아직 준비되지 않았습니다. \$RETRY_DELAY초 후 재시도... (시도 \$i/\$MAX_RETRIES)"
+                                sleep \$RETRY_DELAY
+                            fi
+                        done
+                        
+                        if [ "\$STATUS" != "200" ] && [ "\$STATUS" != "401" ]; then
+                            echo "⚠️ 서버 상태 확인 실패 (상태 코드: \$STATUS)"
+                            echo "📋 컨테이너 로그:"
+                            docker logs board_web --tail 30
+                        fi
+                        
+                        echo '✅ 배포 완료!'
+                        echo '🌐 접속 주소: http://localhost:3000'
+                    """
                 }
             }
         }
