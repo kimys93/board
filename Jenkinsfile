@@ -189,14 +189,38 @@ pipeline {
                             exit 1
                         }
                         
+                        # init.sql 실행 여부 확인
+                        echo "🔍 init.sql 실행 여부 확인 중..."
+                        docker exec board_db ls -la /docker-entrypoint-initdb.d/ 2>/dev/null || echo "⚠️ /docker-entrypoint-initdb.d 디렉토리 확인 실패"
+                        
+                        # MySQL 로그에서 init.sql 실행 확인
+                        if docker logs board_db 2>&1 | grep -q "running /docker-entrypoint-initdb.d/init.sql"; then
+                            echo "✅ init.sql 실행 로그 발견"
+                        else
+                            echo "⚠️ init.sql 실행 로그가 없습니다. 볼륨 마운트 확인 필요"
+                        fi
+                        
                         # DB 테이블 확인
                         echo "📊 DB 테이블 확인 중..."
                         TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
                         if [ "\$TABLE_COUNT" -lt 2 ]; then
                             echo "⚠️ DB 테이블이 생성되지 않았습니다. (테이블 수: \$TABLE_COUNT)"
-                            echo "📋 MySQL 로그 확인:"
-                            docker logs board_db --tail 50
-                            exit 1
+                            echo "📋 init.sql 수동 실행 시도..."
+                            
+                            # init.sql을 컨테이너에 복사하고 수동 실행
+                            docker cp database/init.sql board_db:/tmp/init.sql
+                            docker exec -i board_db sh -c "mysql -u board_user -pboard_password board_db --force < /tmp/init.sql" 2>&1 | grep -v "Duplicate key name" | grep -v "already exists" || true
+                            
+                            # 다시 테이블 확인
+                            TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
+                            if [ "\$TABLE_COUNT" -lt 2 ]; then
+                                echo "❌ init.sql 수동 실행 후에도 테이블이 생성되지 않았습니다. (테이블 수: \$TABLE_COUNT)"
+                                echo "📋 MySQL 로그:"
+                                docker logs board_db --tail 50
+                                exit 1
+                            else
+                                echo "✅ init.sql 수동 실행 완료. (테이블 수: \$TABLE_COUNT)"
+                            fi
                         else
                             echo "✅ DB 테이블이 정상적으로 생성되었습니다. (테이블 수: \$TABLE_COUNT)"
                         fi
