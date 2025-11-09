@@ -166,6 +166,13 @@ pipeline {
                             docker-compose up -d db web
                         }
                         
+                        # siteAuth.credentials 파일을 컨테이너에 복사
+                        sleep 3
+                        docker cp siteAuth.credentials board_web:/app/siteAuth.credentials || echo "⚠️ siteAuth.credentials 복사 실패 (이미 존재할 수 있음)"
+                        
+                        # web 서버 재시작 (siteAuth.credentials 적용)
+                        docker restart board_web || true
+                        
                         echo '✅ 서버가 배포되었습니다!'
                         echo '🌐 접속 주소: http://localhost:3000'
                     """

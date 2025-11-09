@@ -43,7 +43,7 @@ services:
       # - ./config:/app/config
       # - ./middleware:/app/middleware
       # - ./server.js:/app/server.js
-      - ./siteAuth.credentials:/app/siteAuth.credentials
+      # siteAuth.credentials는 docker cp로 복사 (볼륨 마운트 제거)
     networks:
       - board_network
 
