@@ -180,12 +180,35 @@ pipeline {
                             # 포트 해제 대기
                             sleep 3
                             
-                            # 서버 재시작 (새로운 DB로)
+                            # 서버 재시작 (새로운 DB로, init.sql 포함)
                             echo '🔄 서버 재시작 중...'
-                            docker-compose up -d db || {
+                            # docker-compose 대신 docker run을 사용하여 init.sql을 확실히 마운트
+                            docker run -d \\
+                                --name board_db \\
+                                --network board_network \\
+                                -v board_db_data:/var/lib/mysql \\
+                                -v \$(pwd)/database/init.sql:/docker-entrypoint-initdb.d/init.sql \\
+                                -e MYSQL_ROOT_PASSWORD=rootpassword \\
+                                -e MYSQL_DATABASE=board_db \\
+                                -e MYSQL_USER=board_user \\
+                                -e MYSQL_PASSWORD=board_password \\
+                                mysql:8.0 \\
+                                --character-set-server=utf8mb4 \\
+                                --collation-server=utf8mb4_unicode_ci || {
                                 echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
                                 sleep 5
-                                docker-compose up -d db
+                                docker run -d \\
+                                    --name board_db \\
+                                    --network board_network \\
+                                    -v board_db_data:/var/lib/mysql \\
+                                    -v \$(pwd)/database/init.sql:/docker-entrypoint-initdb.d/init.sql \\
+                                    -e MYSQL_ROOT_PASSWORD=rootpassword \\
+                                    -e MYSQL_DATABASE=board_db \\
+                                    -e MYSQL_USER=board_user \\
+                                    -e MYSQL_PASSWORD=board_password \\
+                                    mysql:8.0 \\
+                                    --character-set-server=utf8mb4 \\
+                                    --collation-server=utf8mb4_unicode_ci
                             }
                             
                             # DB 초기화 대기
