@@ -221,8 +221,33 @@ pipeline {
                             
                             # DB 초기화 대기
                             echo '⏳ DB 초기화 대기 중...'
-                            sleep 10
-                            timeout 60 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || exit 1
+                            sleep 15  # init.sql 실행 시간을 위해 대기 시간 증가
+                            
+                            # 컨테이너가 실행 중인지 확인
+                            if ! docker ps --format '{{.Names}}' | grep -q '^board_db\$'; then
+                                echo "❌ DB 컨테이너가 종료되었습니다. 로그 확인:"
+                                docker logs board_db --tail 50
+                                exit 1
+                            fi
+                            
+                            # DB가 준비될 때까지 대기
+                            timeout 120 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || {
+                                echo "❌ DB 초기화 실패. 로그 확인:"
+                                docker logs board_db --tail 50
+                                exit 1
+                            }
+                            
+                            # 테이블이 생성되었는지 확인
+                            echo '📊 DB 테이블 확인 중...'
+                            TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
+                            if [ "\$TABLE_COUNT" -lt 2 ]; then
+                                echo "⚠️ DB 테이블이 생성되지 않았습니다. (테이블 수: \$TABLE_COUNT)"
+                                echo "📋 init.sql 실행 로그:"
+                                docker logs board_db 2>&1 | grep -A 20 "init.sql" || echo "init.sql 실행 로그를 찾을 수 없습니다."
+                                exit 1
+                            else
+                                echo "✅ DB 테이블이 정상적으로 생성되었습니다. (테이블 수: \$TABLE_COUNT)"
+                            fi
                             
                             # Web 서버 시작 (docker-compose 대신 docker run 사용, DB는 이미 실행 중)
                             docker run -d \\
