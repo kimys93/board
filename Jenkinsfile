@@ -152,7 +152,7 @@ pipeline {
                 script {
                     sh """
                         # 서버가 이미 실행 중인지 확인
-                        if docker ps --format '{{.Names}}' | grep -q '^board_web$'; then
+                        if docker ps --format '{{.Names}}' | grep -q '^board_web\$'; then
                             echo 'ℹ️ 서버가 이미 실행 중입니다. 빌드만 완료되었습니다.'
                             echo '💡 새 이미지를 적용하려면 수동으로 서버를 재시작하세요:'
                             echo '   docker restart board_web'
@@ -161,7 +161,7 @@ pipeline {
                             echo '📦 서버가 실행 중이 아니므로 서버를 시작합니다...'
                             
                             # DB가 실행 중인지 확인
-                            if ! docker ps --format '{{.Names}}' | grep -q '^board_db$'; then
+                            if ! docker ps --format '{{.Names}}' | grep -q '^board_db\$'; then
                                 echo '📦 DB 서버 시작 중...'
                                 docker-compose up -d db || {
                                     echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
