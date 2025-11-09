@@ -177,21 +177,7 @@ pipeline {
                         
                         # docker 컨테이너 실행 (web, db만)
                         # init.sql은 docker-compose.yml의 볼륨 마운트로 자동 실행됨
-                        # DB를 먼저 시작하여 초기화 완료 대기
-                        # 절대 경로로 init.sql 마운트 (상대 경로가 디렉토리로 인식되는 문제 해결)
-                        CURRENT_DIR=\$(pwd)
-                        docker run -d \\
-                            --name board_db \\
-                            --network board_network \\
-                            -v board_db_data:/var/lib/mysql \\
-                            -v "\${CURRENT_DIR}/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro" \\
-                            -e MYSQL_ROOT_PASSWORD=rootpassword \\
-                            -e MYSQL_DATABASE=board_db \\
-                            -e MYSQL_USER=board_user \\
-                            -e MYSQL_PASSWORD=board_password \\
-                            mysql:8.0 \\
-                            --character-set-server=utf8mb4 \\
-                            --collation-server=utf8mb4_unicode_ci
+                        docker compose up -d web db
                         
                         # DB 초기화 완료 대기 (healthcheck 활용)
                         echo "⏳ DB 초기화 대기 중..."
