@@ -56,8 +56,15 @@ pipeline {
                     try {
                         // 기존 컨테이너 정리 (jenkins는 절대 건드리지 않음)
                         sh """
+                            # 실행 중인 컨테이너 중지
                             docker stop board_web board_db 2>/dev/null || true
+                            # 컨테이너 제거 (강제)
                             docker rm -f board_web board_db 2>/dev/null || true
+                            # 포트가 사용 중인지 확인하고 대기
+                            sleep 2
+                            # 네트워크에서 분리된 컨테이너 정리
+                            docker network disconnect board_network board_web 2>/dev/null || true
+                            docker network disconnect board_network board_db 2>/dev/null || true
                         """
                         
                         // 네트워크 생성 (이미 있으면 무시)
