@@ -146,16 +146,11 @@ pipeline {
         }
         
         stage('Deploy') {
-            when {
-                branch 'main'
-            }
+            // when 조건 제거: 모든 빌드에서 서버 시작
             steps {
-                echo '🚀 배포 중...'
+                echo '🚀 서버 배포 중...'
                 script {
                     sh """
-                        # 웹 이미지 재빌드
-                        docker build -t board-web:latest .
-                        
                         # 기존 컨테이너 정리 (jenkins는 절대 건드리지 않음)
                         docker stop board_web board_db 2>/dev/null || true
                         docker rm -f board_web board_db 2>/dev/null || true
@@ -183,6 +178,12 @@ pipeline {
                         sleep 10
                         timeout 60 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || exit 1
                         
+                        # siteAuth.credentials 파일 확인
+                        if [ ! -f siteAuth.credentials ]; then
+                            echo "❌ siteAuth.credentials 파일이 없습니다."
+                            exit 1
+                        fi
+                        
                         # Web 컨테이너 시작
                         docker run -d \\
                             --name board_web \\
@@ -195,7 +196,6 @@ pipeline {
                             -v \$(pwd)/config:/app/config \\
                             -v \$(pwd)/middleware:/app/middleware \\
                             -v \$(pwd)/server.js:/app/server.js \\
-                            -v \$(pwd)/siteAuth.credentials:/app/siteAuth.credentials \\
                             -e NODE_ENV=development \\
                             -e DB_HOST=board_db \\
                             -e DB_USER=board_user \\
@@ -203,6 +203,12 @@ pipeline {
                             -e DB_NAME=board_db \\
                             -e JWT_SECRET=your_jwt_secret_key_here \\
                             board-web:latest
+                        
+                        # siteAuth.credentials 파일을 컨테이너에 복사
+                        docker cp siteAuth.credentials board_web:/app/siteAuth.credentials
+                        
+                        echo '✅ 서버가 배포되었습니다!'
+                        echo '🌐 접속 주소: http://localhost:3000'
                     """
                 }
             }
