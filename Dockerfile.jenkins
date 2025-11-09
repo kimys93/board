@@ -28,8 +28,26 @@ ARG DOCKER_GID=999
 RUN groupadd -g ${DOCKER_GID} docker || true && \
     usermod -aG docker jenkins
 
-USER jenkins
+# Git safe.directory 설정을 위한 초기화 스크립트 생성
+# Jenkins 시작 시 자동으로 Git 설정이 적용되도록 함
+RUN mkdir -p /usr/local/bin && \
+    echo '#!/bin/bash' > /usr/local/bin/jenkins-git-config.sh && \
+    echo '# Jenkins 시작 시 Git safe.directory 설정' >> /usr/local/bin/jenkins-git-config.sh && \
+    echo 'if [ -d /var/jenkins_home ]; then' >> /usr/local/bin/jenkins-git-config.sh && \
+    echo '    mkdir -p /var/jenkins_home' >> /usr/local/bin/jenkins-git-config.sh && \
+    echo '    echo "[safe]" >> /var/jenkins_home/.gitconfig' >> /usr/local/bin/jenkins-git-config.sh && \
+    echo '    echo "    directory = *" >> /var/jenkins_home/.gitconfig' >> /usr/local/bin/jenkins-git-config.sh && \
+    echo '    chown jenkins:jenkins /var/jenkins_home/.gitconfig 2>/dev/null || true' >> /usr/local/bin/jenkins-git-config.sh && \
+    echo 'fi' >> /usr/local/bin/jenkins-git-config.sh && \
+    chmod +x /usr/local/bin/jenkins-git-config.sh
 
-# Git safe.directory 설정 (Git 2.35.2+ 보안 정책 대응)
-# Jenkins 작업 디렉토리의 소유권 문제로 인한 "dubious ownership" 에러 방지
-RUN git config --global --add safe.directory '*'
+# Jenkins entrypoint 스크립트를 래핑하여 Git 설정 스크립트 실행
+RUN cp /usr/local/bin/jenkins.sh /usr/local/bin/jenkins.sh.original && \
+    echo '#!/bin/bash' > /usr/local/bin/jenkins.sh && \
+    echo '# Git 설정 적용' >> /usr/local/bin/jenkins.sh && \
+    echo '/usr/local/bin/jenkins-git-config.sh' >> /usr/local/bin/jenkins.sh && \
+    echo '# 원본 Jenkins entrypoint 실행' >> /usr/local/bin/jenkins.sh && \
+    echo 'exec /usr/local/bin/jenkins.sh.original "$@"' >> /usr/local/bin/jenkins.sh && \
+    chmod +x /usr/local/bin/jenkins.sh
+
+USER jenkins
