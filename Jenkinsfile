@@ -205,6 +205,7 @@ pipeline {
                         if [ "\$reset_db" = "true" ] || [ "\$TABLE_COUNT" -lt 2 ]; then
                             echo "📄 init.sql 수동 실행 중..."
                             docker cp database/init.sql board_db:/tmp/init.sql
+                            # IF NOT EXISTS로 중복 생성 방지되므로 정상적인 에러 처리만 사용
                             docker exec -i board_db sh -c "mysql -u board_user -pboard_password board_db < /tmp/init.sql" || {
                                 echo "⚠️ init.sql 실행 실패, root로 재시도..."
                                 docker exec -i board_db sh -c "mysql -u root -prootpassword board_db < /tmp/init.sql" || {
