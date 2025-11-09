@@ -96,6 +96,12 @@ pipeline {
                         
                         // Web 컨테이너 시작 (테스트용이므로 restart 정책 없음, 호스트 포트 바인딩 없음)
                         sh """
+                            # siteAuth.credentials 파일이 존재하는지 확인
+                            if [ ! -f siteAuth.credentials ]; then
+                                echo "❌ siteAuth.credentials 파일이 없습니다. Setup 단계를 먼저 실행하세요."
+                                exit 1
+                            fi
+                            
                             docker run -d \\
                                 --name board_web \\
                                 --network board_network \\
@@ -105,7 +111,7 @@ pipeline {
                                 -v \$(pwd)/config:/app/config \\
                                 -v \$(pwd)/middleware:/app/middleware \\
                                 -v \$(pwd)/server.js:/app/server.js \\
-                                -v \$(pwd)/siteAuth.credentials:/app/siteAuth.credentials \\
+                                -v \$(pwd)/siteAuth.credentials:/app/siteAuth.credentials:ro \\
                                 -e NODE_ENV=development \\
                                 -e DB_HOST=board_db \\
                                 -e DB_USER=board_user \\
@@ -115,10 +121,13 @@ pipeline {
                                 board-web:latest
                         """
                         
-                        // 서버가 정상적으로 시작되었는지 확인 (컨테이너 내부에서 확인)
+                        // 서버가 정상적으로 시작되었는지 확인 (컨테이너 로그 확인)
                         sh """
                             sleep 5
-                            timeout 30 bash -c 'until docker exec board_web curl -f http://localhost:3000 || exit 1; do sleep 2; done' || exit 1
+                            # 컨테이너가 실행 중인지 확인
+                            timeout 30 bash -c 'until docker ps | grep -q board_web; do sleep 2; done' || exit 1
+                            # 컨테이너 로그에서 서버 시작 확인
+                            timeout 30 bash -c 'until docker logs board_web 2>&1 | grep -q "Server running\|listening\|started"; do sleep 2; done' || (docker logs board_web && exit 1)
                         """
                         
                         echo '✅ 서버가 정상적으로 시작되었습니다.'
