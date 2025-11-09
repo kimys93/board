@@ -200,20 +200,67 @@ pipeline {
                             exit 1
                         }
                         
+                        # MySQL이 실제로 쿼리를 받을 수 있을 때까지 추가 대기
+                        echo "⏳ MySQL 쿼리 준비 대기 중..."
+                        MAX_RETRIES=30
+                        RETRY_COUNT=0
+                        while [ \$RETRY_COUNT -lt \$MAX_RETRIES ]; do
+                            if docker exec board_db mysql -u board_user -pboard_password board_db -e "SELECT 1;" 2>/dev/null > /dev/null; then
+                                echo "✅ MySQL이 쿼리를 받을 준비가 되었습니다."
+                                break
+                            fi
+                            RETRY_COUNT=\$((RETRY_COUNT + 1))
+                            echo "⏳ MySQL 준비 대기 중... (\$RETRY_COUNT/\$MAX_RETRIES)"
+                            sleep 2
+                        done
+                        
+                        if [ \$RETRY_COUNT -eq \$MAX_RETRIES ]; then
+                            echo "❌ MySQL이 쿼리를 받을 준비가 되지 않았습니다."
+                            docker logs board_db --tail 50
+                            exit 1
+                        fi
+                        
                         # reset_db일 때 또는 테이블이 없을 때 init.sql 수동 실행
                         TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
                         if [ "\$reset_db" = "true" ] || [ "\$TABLE_COUNT" -lt 2 ]; then
                             echo "📄 init.sql 수동 실행 중..."
                             docker cp database/init.sql board_db:/tmp/init.sql
-                            # IF NOT EXISTS로 중복 생성 방지되므로 정상적인 에러 처리만 사용
-                            docker exec -i board_db sh -c "mysql -u board_user -pboard_password board_db < /tmp/init.sql" || {
-                                echo "⚠️ init.sql 실행 실패, root로 재시도..."
-                                docker exec -i board_db sh -c "mysql -u root -prootpassword board_db < /tmp/init.sql" || {
-                                    echo "❌ init.sql 실행 실패. 로그 확인:"
-                                    docker logs board_db --tail 50
-                                    exit 1
-                                }
-                            }
+                            
+                            # 재시도 로직 추가
+                            MAX_SQL_RETRIES=5
+                            SQL_RETRY_COUNT=0
+                            SQL_SUCCESS=false
+                            
+                            while [ \$SQL_RETRY_COUNT -lt \$MAX_SQL_RETRIES ]; do
+                                if docker exec -i board_db sh -c "mysql -u board_user -pboard_password board_db < /tmp/init.sql" 2>/dev/null; then
+                                    SQL_SUCCESS=true
+                                    break
+                                fi
+                                SQL_RETRY_COUNT=\$((SQL_RETRY_COUNT + 1))
+                                echo "⚠️ init.sql 실행 실패, 재시도 중... (\$SQL_RETRY_COUNT/\$MAX_SQL_RETRIES)"
+                                sleep 3
+                            done
+                            
+                            if [ "\$SQL_SUCCESS" = "false" ]; then
+                                echo "⚠️ board_user로 실패, root로 재시도..."
+                                SQL_RETRY_COUNT=0
+                                while [ \$SQL_RETRY_COUNT -lt \$MAX_SQL_RETRIES ]; do
+                                    if docker exec -i board_db sh -c "mysql -u root -prootpassword board_db < /tmp/init.sql" 2>/dev/null; then
+                                        SQL_SUCCESS=true
+                                        break
+                                    fi
+                                    SQL_RETRY_COUNT=\$((SQL_RETRY_COUNT + 1))
+                                    echo "⚠️ root로 재시도 중... (\$SQL_RETRY_COUNT/\$MAX_SQL_RETRIES)"
+                                    sleep 3
+                                done
+                            fi
+                            
+                            if [ "\$SQL_SUCCESS" = "false" ]; then
+                                echo "❌ init.sql 실행 실패. 로그 확인:"
+                                docker logs board_db --tail 50
+                                exit 1
+                            fi
+                            
                             echo "✅ init.sql 실행 완료"
                             
                             # 테이블 확인
