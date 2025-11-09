@@ -182,7 +182,6 @@ pipeline {
                             
                             # 서버 재시작 (새로운 DB로, init.sql 포함)
                             echo '🔄 서버 재시작 중...'
-                            # docker-compose 대신 docker run을 사용하여 init.sql을 확실히 마운트
                             # init.sql 파일 경로 확인
                             INIT_SQL_PATH=\$(pwd)/database/init.sql
                             if [ ! -f "\$INIT_SQL_PATH" ]; then
@@ -191,11 +190,11 @@ pipeline {
                             fi
                             echo "📄 init.sql 경로: \$INIT_SQL_PATH"
                             
+                            # DB 컨테이너 시작 (init.sql은 나중에 수동 실행)
                             docker run -d \\
                                 --name board_db \\
                                 --network board_network \\
                                 -v board_db_data:/var/lib/mysql \\
-                                -v "\$INIT_SQL_PATH:/docker-entrypoint-initdb.d/init.sql:ro" \\
                                 -e MYSQL_ROOT_PASSWORD=rootpassword \\
                                 -e MYSQL_DATABASE=board_db \\
                                 -e MYSQL_USER=board_user \\
@@ -209,7 +208,6 @@ pipeline {
                                     --name board_db \\
                                     --network board_network \\
                                     -v board_db_data:/var/lib/mysql \\
-                                    -v "\$INIT_SQL_PATH:/docker-entrypoint-initdb.d/init.sql:ro" \\
                                     -e MYSQL_ROOT_PASSWORD=rootpassword \\
                                     -e MYSQL_DATABASE=board_db \\
                                     -e MYSQL_USER=board_user \\
@@ -219,22 +217,25 @@ pipeline {
                                     --collation-server=utf8mb4_unicode_ci
                             }
                             
-                            # DB 초기화 대기
-                            echo '⏳ DB 초기화 대기 중...'
-                            sleep 15  # init.sql 실행 시간을 위해 대기 시간 증가
-                            
-                            # 컨테이너가 실행 중인지 확인
-                            if ! docker ps --format '{{.Names}}' | grep -q '^board_db\$'; then
-                                echo "❌ DB 컨테이너가 종료되었습니다. 로그 확인:"
-                                docker logs board_db --tail 50
-                                exit 1
-                            fi
-                            
                             # DB가 준비될 때까지 대기
+                            echo '⏳ DB 준비 대기 중...'
+                            sleep 10
                             timeout 120 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || {
-                                echo "❌ DB 초기화 실패. 로그 확인:"
+                                echo "❌ DB 시작 실패. 로그 확인:"
                                 docker logs board_db --tail 50
                                 exit 1
+                            }
+                            
+                            # init.sql을 컨테이너에 복사하고 실행
+                            echo '📄 init.sql 실행 중...'
+                            docker cp "\$INIT_SQL_PATH" board_db:/tmp/init.sql
+                            docker exec board_db mysql -u board_user -pboard_password board_db < /tmp/init.sql || {
+                                echo "⚠️ init.sql 실행 실패, root로 재시도..."
+                                docker exec board_db mysql -u root -prootpassword board_db < /tmp/init.sql || {
+                                    echo "❌ init.sql 실행 실패. 로그 확인:"
+                                    docker logs board_db --tail 50
+                                    exit 1
+                                }
                             }
                             
                             # 테이블이 생성되었는지 확인
@@ -242,8 +243,8 @@ pipeline {
                             TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
                             if [ "\$TABLE_COUNT" -lt 2 ]; then
                                 echo "⚠️ DB 테이블이 생성되지 않았습니다. (테이블 수: \$TABLE_COUNT)"
-                                echo "📋 init.sql 실행 로그:"
-                                docker logs board_db 2>&1 | grep -A 20 "init.sql" || echo "init.sql 실행 로그를 찾을 수 없습니다."
+                                echo "📋 생성된 테이블:"
+                                docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null || true
                                 exit 1
                             else
                                 echo "✅ DB 테이블이 정상적으로 생성되었습니다. (테이블 수: \$TABLE_COUNT)"
