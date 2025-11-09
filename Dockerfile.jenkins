@@ -15,3 +15,6 @@ RUN groupadd -g ${DOCKER_GID} docker || true && \
 
 USER jenkins
 
+# Git safe.directory 설정 (Git 2.35.2+ 보안 정책 대응)
+# Jenkins 작업 디렉토리의 소유권 문제로 인한 "dubious ownership" 에러 방지
+RUN git config --global --add safe.directory '*'
