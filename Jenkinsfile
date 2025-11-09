@@ -103,11 +103,12 @@ pipeline {
                                 exit 1
                             fi
                             
+                            # siteAuth.credentials를 컨테이너에 복사하여 사용
+                            # (볼륨 마운트 대신 docker cp 사용하거나, 환경 변수로 전달)
                             docker run -d \\
                                 --name board_web \\
                                 --network board_network \\
                                 -v \$(pwd)/uploads:/app/uploads \\
-                                -v \$(pwd)/siteAuth.credentials:/app/siteAuth.credentials:ro \\
                                 -e NODE_ENV=development \\
                                 -e DB_HOST=board_db \\
                                 -e DB_USER=board_user \\
@@ -115,6 +116,9 @@ pipeline {
                                 -e DB_NAME=board_db \\
                                 -e JWT_SECRET=your_jwt_secret_key_here \\
                                 board-web:latest
+                            
+                            # siteAuth.credentials 파일을 컨테이너에 복사
+                            docker cp siteAuth.credentials board_web:/app/siteAuth.credentials
                         """
                         
                         // 서버가 정상적으로 시작되었는지 확인 (컨테이너 로그 확인)

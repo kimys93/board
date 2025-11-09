@@ -1,0 +1,32 @@
+# Git 관련
+.git
+.gitignore
+
+# Node.js
+node_modules
+npm-debug.log
+
+# 환경 변수 및 인증 정보 (이미지에 포함하지 않음)
+siteAuth.credentials
+.env
+*.credentials
+
+# 문서
+*.md
+README.md
+
+# Jenkins 관련
+Jenkinsfile
+Dockerfile.jenkins
+JENKINS_*.md
+
+# 테스트 파일
+test_*.json
+
+# 업로드 파일 (볼륨으로 마운트)
+uploads/*
+
+# IDE
+.vscode
+.idea
+
