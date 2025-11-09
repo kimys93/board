@@ -57,6 +57,18 @@ CREATE TABLE IF NOT EXISTS attachments (
     FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
 );
 
+-- 개인 채팅방 테이블 (chat_messages보다 먼저 생성 필요)
+CREATE TABLE IF NOT EXISTS chat_rooms (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user1_id INT NOT NULL,
+    user2_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user1_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (user2_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_chat (user1_id, user2_id)
+);
+
 -- 채팅 메시지 테이블
 CREATE TABLE IF NOT EXISTS chat_messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -109,19 +121,6 @@ CREATE INDEX idx_notifications_user ON notifications(user_id);
 CREATE INDEX idx_notifications_read ON notifications(read_status);
 CREATE INDEX idx_notifications_created ON notifications(created_at);
 CREATE INDEX idx_notification_settings_user ON notification_settings(user_id);
-
--- 개인 채팅방 테이블
-CREATE TABLE IF NOT EXISTS chat_rooms (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user1_id INT NOT NULL,
-    user2_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user1_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (user2_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_chat (user1_id, user2_id)
-);
-
 
 -- 사용자 온라인 상태 테이블
 CREATE TABLE IF NOT EXISTS user_status (
