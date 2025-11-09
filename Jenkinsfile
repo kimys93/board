@@ -240,37 +240,30 @@ pipeline {
                                 INIT_SQL_PATH="/tmp/init.sql"
                             fi
                             
-                            # 재시도 로직 추가
-                            MAX_SQL_RETRIES=5
-                            SQL_RETRY_COUNT=0
-                            SQL_SUCCESS=false
+                            # MySQL이 안정화될 때까지 대기
+                            echo "⏳ MySQL 안정화 대기 중..."
+                            sleep 5
                             
-                            while [ \$SQL_RETRY_COUNT -lt \$MAX_SQL_RETRIES ]; do
-                                if docker exec -i board_db sh -c "mysql -u board_user -pboard_password board_db < \$INIT_SQL_PATH" 2>/dev/null; then
+                            # init.sql 실행 (에러 메시지 출력)
+                            echo "📄 init.sql 실행 중... (경로: \$INIT_SQL_PATH)"
+                            if docker exec -i board_db sh -c "mysql -u board_user -pboard_password board_db < \$INIT_SQL_PATH" 2>&1; then
+                                SQL_SUCCESS=true
+                            else
+                                EXIT_CODE=\$?
+                                echo "⚠️ board_user로 실행 실패 (종료 코드: \$EXIT_CODE), root로 재시도..."
+                                if docker exec -i board_db sh -c "mysql -u root -prootpassword board_db < \$INIT_SQL_PATH" 2>&1; then
                                     SQL_SUCCESS=true
-                                    break
+                                else
+                                    EXIT_CODE=\$?
+                                    echo "❌ root로도 실행 실패 (종료 코드: \$EXIT_CODE)"
+                                    SQL_SUCCESS=false
                                 fi
-                                SQL_RETRY_COUNT=\$((SQL_RETRY_COUNT + 1))
-                                echo "⚠️ init.sql 실행 실패, 재시도 중... (\$SQL_RETRY_COUNT/\$MAX_SQL_RETRIES)"
-                                sleep 3
-                            done
-                            
-                            if [ "\$SQL_SUCCESS" = "false" ]; then
-                                echo "⚠️ board_user로 실패, root로 재시도..."
-                                SQL_RETRY_COUNT=0
-                                while [ \$SQL_RETRY_COUNT -lt \$MAX_SQL_RETRIES ]; do
-                                    if docker exec -i board_db sh -c "mysql -u root -prootpassword board_db < \$INIT_SQL_PATH" 2>/dev/null; then
-                                        SQL_SUCCESS=true
-                                        break
-                                    fi
-                                    SQL_RETRY_COUNT=\$((SQL_RETRY_COUNT + 1))
-                                    echo "⚠️ root로 재시도 중... (\$SQL_RETRY_COUNT/\$MAX_SQL_RETRIES)"
-                                    sleep 3
-                                done
                             fi
                             
                             if [ "\$SQL_SUCCESS" = "false" ]; then
-                                echo "❌ init.sql 실행 실패. 로그 확인:"
+                                echo "❌ init.sql 실행 실패. 컨테이너 상태 확인:"
+                                docker ps -a | grep board_db
+                                echo "📋 MySQL 로그:"
                                 docker logs board_db --tail 50
                                 exit 1
                             fi
