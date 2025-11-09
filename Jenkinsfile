@@ -72,12 +72,11 @@ pipeline {
                             docker network create board_network 2>/dev/null || true
                         """
                         
-                        // DB 컨테이너 시작 (테스트용이므로 restart 정책 없음)
+                        // DB 컨테이너 시작 (테스트용이므로 restart 정책 없음, 호스트 포트 바인딩 없음)
                         sh """
                             docker run -d \\
                                 --name board_db \\
                                 --network board_network \\
-                                -p 3306:3306 \\
                                 -v board_db_data:/var/lib/mysql \\
                                 -v \$(pwd)/database/init.sql:/docker-entrypoint-initdb.d/init.sql \\
                                 -e MYSQL_ROOT_PASSWORD=rootpassword \\
@@ -95,12 +94,11 @@ pipeline {
                             timeout 60 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || exit 1
                         """
                         
-                        // Web 컨테이너 시작 (테스트용이므로 restart 정책 없음)
+                        // Web 컨테이너 시작 (테스트용이므로 restart 정책 없음, 호스트 포트 바인딩 없음)
                         sh """
                             docker run -d \\
                                 --name board_web \\
                                 --network board_network \\
-                                -p 0.0.0.0:3000:3000 \\
                                 -v \$(pwd)/uploads:/app/uploads \\
                                 -v \$(pwd)/public:/app/public \\
                                 -v \$(pwd)/routes:/app/routes \\
@@ -117,10 +115,10 @@ pipeline {
                                 board-web:latest
                         """
                         
-                        // 서버가 정상적으로 시작되었는지 확인
+                        // 서버가 정상적으로 시작되었는지 확인 (컨테이너 내부에서 확인)
                         sh """
                             sleep 5
-                            timeout 30 bash -c 'until curl -f http://localhost:3000 || exit 1; do sleep 2; done' || exit 1
+                            timeout 30 bash -c 'until docker exec board_web curl -f http://localhost:3000 || exit 1; do sleep 2; done' || exit 1
                         """
                         
                         echo '✅ 서버가 정상적으로 시작되었습니다.'
