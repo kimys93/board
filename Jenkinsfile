@@ -1,6 +1,15 @@
 pipeline {
     agent any
     
+    // 빌드 파라미터 정의
+    parameters {
+        booleanParam(
+            name: 'reset_db',
+            defaultValue: false,
+            description: 'DB 데이터를 초기화하고 서버를 재시작합니다. (주의: 모든 데이터가 삭제됩니다!)'
+        )
+    }
+    
     environment {
         PROJECT_NAME = 'board'
         // Jenkins Credentials 사용 (보안)
@@ -150,9 +159,58 @@ pipeline {
             steps {
                 echo '🚀 서버 배포 중...'
                 script {
-                    sh """
-                        # 서버가 이미 실행 중인지 확인
-                        if docker ps --format '{{.Names}}' | grep -q '^board_web\$'; then
+                    // reset_db 파라미터 확인
+                    if (params.reset_db) {
+                        echo '⚠️⚠️⚠️ DB 리셋 모드: 모든 데이터가 삭제됩니다! ⚠️⚠️⚠️'
+                        sh """
+                            # 모든 서버 중지 및 제거
+                            echo '🛑 서버 중지 중...'
+                            docker-compose down || true
+                            docker stop board_web board_db 2>/dev/null || true
+                            docker rm -f board_web board_db 2>/dev/null || true
+                            
+                            # DB 볼륨 삭제 (데이터 초기화)
+                            echo '🗑️ DB 볼륨 삭제 중...'
+                            docker volume rm board_db_data 2>/dev/null || echo "⚠️ 볼륨이 이미 삭제되었거나 존재하지 않습니다."
+                            
+                            # 포트 해제 대기
+                            sleep 3
+                            
+                            # 서버 재시작 (새로운 DB로)
+                            echo '🔄 서버 재시작 중...'
+                            docker-compose up -d db || {
+                                echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
+                                sleep 5
+                                docker-compose up -d db
+                            }
+                            
+                            # DB 초기화 대기
+                            echo '⏳ DB 초기화 대기 중...'
+                            sleep 10
+                            timeout 60 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || exit 1
+                            
+                            # Web 서버 시작
+                            docker-compose up -d web || {
+                                echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
+                                sleep 5
+                                docker-compose up -d web
+                            }
+                            
+                            # siteAuth.credentials 파일을 컨테이너에 복사
+                            sleep 3
+                            docker cp siteAuth.credentials board_web:/app/siteAuth.credentials || echo "⚠️ siteAuth.credentials 복사 실패 (이미 존재할 수 있음)"
+                            
+                            # web 서버 재시작 (siteAuth.credentials 적용)
+                            docker restart board_web || true
+                            
+                            echo '✅ DB가 초기화되고 서버가 재시작되었습니다!'
+                            echo '🌐 접속 주소: http://localhost:3000'
+                        """
+                    } else {
+                        // 일반 배포 로직
+                        sh """
+                            # 서버가 이미 실행 중인지 확인
+                            if docker ps --format '{{.Names}}' | grep -q '^board_web\$'; then
                             echo 'ℹ️ 서버가 이미 실행 중입니다. 빌드만 완료되었습니다.'
                             echo '💡 새 이미지를 적용하려면 수동으로 서버를 재시작하세요:'
                             echo '   docker restart board_web'
@@ -191,7 +249,8 @@ pipeline {
                             echo '✅ 서버가 배포되었습니다!'
                             echo '🌐 접속 주소: http://localhost:3000'
                         fi
-                    """
+                        """
+                    }
                 }
             }
         }
