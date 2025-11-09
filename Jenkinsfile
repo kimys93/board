@@ -178,7 +178,20 @@ pipeline {
                         # docker 컨테이너 실행 (web, db만)
                         # init.sql은 docker-compose.yml의 볼륨 마운트로 자동 실행됨
                         # DB를 먼저 시작하여 초기화 완료 대기
-                        docker compose up -d db
+                        # 절대 경로로 init.sql 마운트 (상대 경로가 디렉토리로 인식되는 문제 해결)
+                        CURRENT_DIR=\$(pwd)
+                        docker run -d \\
+                            --name board_db \\
+                            --network board_network \\
+                            -v board_db_data:/var/lib/mysql \\
+                            -v "\${CURRENT_DIR}/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro" \\
+                            -e MYSQL_ROOT_PASSWORD=rootpassword \\
+                            -e MYSQL_DATABASE=board_db \\
+                            -e MYSQL_USER=board_user \\
+                            -e MYSQL_PASSWORD=board_password \\
+                            mysql:8.0 \\
+                            --character-set-server=utf8mb4 \\
+                            --collation-server=utf8mb4_unicode_ci
                         
                         # DB 초기화 완료 대기 (healthcheck 활용)
                         echo "⏳ DB 초기화 대기 중..."
@@ -189,38 +202,14 @@ pipeline {
                             exit 1
                         }
                         
-                        # init.sql 실행 여부 확인
-                        echo "🔍 init.sql 실행 여부 확인 중..."
-                        docker exec board_db ls -la /docker-entrypoint-initdb.d/ 2>/dev/null || echo "⚠️ /docker-entrypoint-initdb.d 디렉토리 확인 실패"
-                        
-                        # MySQL 로그에서 init.sql 실행 확인
-                        if docker logs board_db 2>&1 | grep -q "running /docker-entrypoint-initdb.d/init.sql"; then
-                            echo "✅ init.sql 실행 로그 발견"
-                        else
-                            echo "⚠️ init.sql 실행 로그가 없습니다. 볼륨 마운트 확인 필요"
-                        fi
-                        
                         # DB 테이블 확인
                         echo "📊 DB 테이블 확인 중..."
                         TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
                         if [ "\$TABLE_COUNT" -lt 2 ]; then
-                            echo "⚠️ DB 테이블이 생성되지 않았습니다. (테이블 수: \$TABLE_COUNT)"
-                            echo "📋 init.sql 수동 실행 시도..."
-                            
-                            # init.sql을 컨테이너에 복사하고 수동 실행
-                            docker cp database/init.sql board_db:/tmp/init.sql
-                            docker exec -i board_db sh -c "mysql -u board_user -pboard_password board_db --force < /tmp/init.sql" 2>&1 | grep -v "Duplicate key name" | grep -v "already exists" || true
-                            
-                            # 다시 테이블 확인
-                            TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
-                            if [ "\$TABLE_COUNT" -lt 2 ]; then
-                                echo "❌ init.sql 수동 실행 후에도 테이블이 생성되지 않았습니다. (테이블 수: \$TABLE_COUNT)"
-                                echo "📋 MySQL 로그:"
-                                docker logs board_db --tail 50
-                                exit 1
-                            else
-                                echo "✅ init.sql 수동 실행 완료. (테이블 수: \$TABLE_COUNT)"
-                            fi
+                            echo "❌ DB 테이블이 생성되지 않았습니다. (테이블 수: \$TABLE_COUNT)"
+                            echo "📋 MySQL 로그:"
+                            docker logs board_db --tail 50
+                            exit 1
                         else
                             echo "✅ DB 테이블이 정상적으로 생성되었습니다. (테이블 수: \$TABLE_COUNT)"
                         fi
