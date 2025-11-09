@@ -109,19 +109,6 @@ CREATE TABLE IF NOT EXISTS notification_settings (
     UNIQUE KEY unique_user_settings (user_id)
 );
 
--- 인덱스 생성 (IF NOT EXISTS로 중복 생성 방지)
-CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author_id);
-CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at);
-CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id);
-CREATE INDEX IF NOT EXISTS idx_comments_author ON comments(author_id);
-CREATE INDEX IF NOT EXISTS idx_attachments_post ON attachments(post_id);
-CREATE INDEX IF NOT EXISTS idx_chat_messages_user ON chat_messages(user_id);
-CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages(created_at);
-CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read_status);
-CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
-CREATE INDEX IF NOT EXISTS idx_notification_settings_user ON notification_settings(user_id);
-
 -- 사용자 온라인 상태 테이블
 CREATE TABLE IF NOT EXISTS user_status (
     user_id INT PRIMARY KEY,
@@ -130,8 +117,18 @@ CREATE TABLE IF NOT EXISTS user_status (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 개인 채팅 관련 인덱스
-CREATE INDEX IF NOT EXISTS idx_chat_rooms_user1 ON chat_rooms(user1_id);
-CREATE INDEX IF NOT EXISTS idx_chat_rooms_user2 ON chat_rooms(user2_id);
-CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages(created_at);
-CREATE INDEX IF NOT EXISTS idx_user_status_online ON user_status(is_online);
+-- 인덱스 생성 (중복 시 에러 무시)
+CREATE INDEX idx_posts_author ON posts(author_id);
+CREATE INDEX idx_posts_created ON posts(created_at);
+CREATE INDEX idx_comments_post ON comments(post_id);
+CREATE INDEX idx_comments_author ON comments(author_id);
+CREATE INDEX idx_attachments_post ON attachments(post_id);
+CREATE INDEX idx_chat_messages_user ON chat_messages(user_id);
+CREATE INDEX idx_chat_messages_created ON chat_messages(created_at);
+CREATE INDEX idx_notifications_user ON notifications(user_id);
+CREATE INDEX idx_notifications_read ON notifications(read_status);
+CREATE INDEX idx_notifications_created ON notifications(created_at);
+CREATE INDEX idx_notification_settings_user ON notification_settings(user_id);
+CREATE INDEX idx_chat_rooms_user1 ON chat_rooms(user1_id);
+CREATE INDEX idx_chat_rooms_user2 ON chat_rooms(user2_id);
+CREATE INDEX idx_user_status_online ON user_status(is_online);

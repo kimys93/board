@@ -15,6 +15,11 @@ services:
     volumes:
       - db_data:/var/lib/mysql
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - board_network
 
@@ -33,7 +38,8 @@ services:
       - DB_NAME=board_db
       - JWT_SECRET=your_jwt_secret_key_here
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
       - ./uploads:/app/uploads
       # 개발 환경에서는 코드 변경을 즉시 반영하기 위해 볼륨 마운트 사용

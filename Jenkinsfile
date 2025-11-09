@@ -170,112 +170,14 @@ pipeline {
                             echo "⚠️⚠️⚠️ DB 리셋 모드: 모든 데이터가 삭제됩니다! ⚠️⚠️⚠️"
                             echo "🗑️ DB 볼륨 삭제 중..."
                             docker volume rm board_db_data 2>/dev/null || echo "⚠️ 볼륨이 이미 삭제되었거나 존재하지 않습니다."
-                            # 볼륨 삭제 후 컨테이너도 완전히 제거 (init.sql 실행을 위해)
-                            docker rm -f board_db 2>/dev/null || true
                         fi
                         
                         # 포트 해제 대기
                         sleep 2
                         
-                        # init.sql 파일 확인
-                        if [ ! -f database/init.sql ]; then
-                            echo "❌ 오류: database/init.sql 파일을 찾을 수 없습니다."
-                            echo "📋 현재 디렉토리: \$(pwd)"
-                            echo "📋 파일 목록:"
-                            ls -la database/ 2>/dev/null || echo "database 디렉토리가 없습니다."
-                            exit 1
-                        fi
-                        
-                        echo "✅ init.sql 파일 확인 완료"
-                        
                         # docker 컨테이너 실행 (web, db만)
+                        # init.sql은 docker-compose.yml의 볼륨 마운트로 자동 실행됨
                         docker compose up -d web db
-                        
-                        # DB 초기화 대기
-                        echo "⏳ DB 초기화 대기 중..."
-                        sleep 15
-                        timeout 120 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || {
-                            echo "❌ DB 시작 실패. 로그 확인:"
-                            docker logs board_db --tail 50
-                            exit 1
-                        }
-                        
-                        # MySQL이 실제로 쿼리를 받을 수 있을 때까지 추가 대기
-                        echo "⏳ MySQL 쿼리 준비 대기 중..."
-                        MAX_RETRIES=30
-                        RETRY_COUNT=0
-                        while [ \$RETRY_COUNT -lt \$MAX_RETRIES ]; do
-                            if docker exec board_db mysql -u board_user -pboard_password board_db -e "SELECT 1;" 2>/dev/null > /dev/null; then
-                                echo "✅ MySQL이 쿼리를 받을 준비가 되었습니다."
-                                break
-                            fi
-                            RETRY_COUNT=\$((RETRY_COUNT + 1))
-                            echo "⏳ MySQL 준비 대기 중... (\$RETRY_COUNT/\$MAX_RETRIES)"
-                            sleep 2
-                        done
-                        
-                        if [ \$RETRY_COUNT -eq \$MAX_RETRIES ]; then
-                            echo "❌ MySQL이 쿼리를 받을 준비가 되지 않았습니다."
-                            docker logs board_db --tail 50
-                            exit 1
-                        fi
-                        
-                        # reset_db일 때 또는 테이블이 없을 때 init.sql 수동 실행
-                        TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
-                        if [ "\$reset_db" = "true" ] || [ "\$TABLE_COUNT" -lt 2 ]; then
-                            echo "📄 init.sql 수동 실행 중..."
-                            
-                            # 볼륨 마운트된 파일 확인
-                            echo "🔍 볼륨 마운트된 init.sql 확인 중..."
-                            if docker exec board_db test -f /docker-entrypoint-initdb.d/init.sql; then
-                                echo "✅ 볼륨 마운트된 init.sql 파일 발견"
-                                INIT_SQL_PATH="/docker-entrypoint-initdb.d/init.sql"
-                            elif docker exec board_db test -d /docker-entrypoint-initdb.d/init.sql; then
-                                echo "⚠️ /docker-entrypoint-initdb.d/init.sql이 디렉토리로 인식됨. docker cp로 복사 후 사용"
-                                docker cp database/init.sql board_db:/tmp/init.sql
-                                INIT_SQL_PATH="/tmp/init.sql"
-                            else
-                                echo "⚠️ 볼륨 마운트 실패. docker cp로 복사 후 사용"
-                                docker cp database/init.sql board_db:/tmp/init.sql
-                                INIT_SQL_PATH="/tmp/init.sql"
-                            fi
-                            
-                            # MySQL이 안정화될 때까지 대기
-                            echo "⏳ MySQL 안정화 대기 중..."
-                            sleep 5
-                            
-                            # init.sql 실행 (에러 메시지 출력)
-                            echo "📄 init.sql 실행 중... (경로: \$INIT_SQL_PATH)"
-                            if docker exec -i board_db sh -c "mysql -u board_user -pboard_password board_db < \$INIT_SQL_PATH" 2>&1; then
-                                SQL_SUCCESS=true
-                            else
-                                EXIT_CODE=\$?
-                                echo "⚠️ board_user로 실행 실패 (종료 코드: \$EXIT_CODE), root로 재시도..."
-                                if docker exec -i board_db sh -c "mysql -u root -prootpassword board_db < \$INIT_SQL_PATH" 2>&1; then
-                                    SQL_SUCCESS=true
-                                else
-                                    EXIT_CODE=\$?
-                                    echo "❌ root로도 실행 실패 (종료 코드: \$EXIT_CODE)"
-                                    SQL_SUCCESS=false
-                                fi
-                            fi
-                            
-                            if [ "\$SQL_SUCCESS" = "false" ]; then
-                                echo "❌ init.sql 실행 실패. 컨테이너 상태 확인:"
-                                docker ps -a | grep board_db
-                                echo "📋 MySQL 로그:"
-                                docker logs board_db --tail 50
-                                exit 1
-                            fi
-                            
-                            echo "✅ init.sql 실행 완료"
-                            
-                            # 테이블 확인
-                            TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
-                            echo "📊 생성된 테이블 수: \$TABLE_COUNT"
-                        else
-                            echo "✅ DB 테이블이 이미 존재합니다. (테이블 수: \$TABLE_COUNT)"
-                        fi
                         
                         # siteAuth.credentials 파일을 컨테이너에 복사
                         sleep 3
