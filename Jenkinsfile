@@ -146,35 +146,51 @@ pipeline {
         }
         
         stage('Deploy') {
-            // 모든 빌드에서 서버 시작 (docker-compose 사용)
+            // 서버 상태 확인 후 선택적 배포
             steps {
                 echo '🚀 서버 배포 중...'
                 script {
                     sh """
-                        # 기존 컨테이너 정리 (jenkins는 절대 건드리지 않음)
-                        docker stop board_web board_db 2>/dev/null || true
-                        docker rm -f board_web board_db 2>/dev/null || true
-                        
-                        # 포트 해제 대기
-                        sleep 3
-                        
-                        # docker-compose로 서버 시작 (jenkins 서비스는 제외)
-                        # 포트 충돌 시 재시도
-                        docker-compose up -d db web || {
-                            echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
-                            sleep 5
-                            docker-compose up -d db web
-                        }
-                        
-                        # siteAuth.credentials 파일을 컨테이너에 복사
-                        sleep 3
-                        docker cp siteAuth.credentials board_web:/app/siteAuth.credentials || echo "⚠️ siteAuth.credentials 복사 실패 (이미 존재할 수 있음)"
-                        
-                        # web 서버 재시작 (siteAuth.credentials 적용)
-                        docker restart board_web || true
-                        
-                        echo '✅ 서버가 배포되었습니다!'
-                        echo '🌐 접속 주소: http://localhost:3000'
+                        # 서버가 이미 실행 중인지 확인
+                        if docker ps --format '{{.Names}}' | grep -q '^board_web$'; then
+                            echo 'ℹ️ 서버가 이미 실행 중입니다. 빌드만 완료되었습니다.'
+                            echo '💡 새 이미지를 적용하려면 수동으로 서버를 재시작하세요:'
+                            echo '   docker restart board_web'
+                            echo '✅ 빌드 완료! (서버는 재시작하지 않음)'
+                        else
+                            echo '📦 서버가 실행 중이 아니므로 서버를 시작합니다...'
+                            
+                            # DB가 실행 중인지 확인
+                            if ! docker ps --format '{{.Names}}' | grep -q '^board_db$'; then
+                                echo '📦 DB 서버 시작 중...'
+                                docker-compose up -d db || {
+                                    echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
+                                    sleep 5
+                                    docker-compose up -d db
+                                }
+                                sleep 5
+                            else
+                                echo 'ℹ️ DB 서버가 이미 실행 중입니다.'
+                            fi
+                            
+                            # Web 서버 시작
+                            echo '📦 Web 서버 시작 중...'
+                            docker-compose up -d web || {
+                                echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
+                                sleep 5
+                                docker-compose up -d web
+                            }
+                            
+                            # siteAuth.credentials 파일을 컨테이너에 복사
+                            sleep 3
+                            docker cp siteAuth.credentials board_web:/app/siteAuth.credentials || echo "⚠️ siteAuth.credentials 복사 실패 (이미 존재할 수 있음)"
+                            
+                            # web 서버 재시작 (siteAuth.credentials 적용)
+                            docker restart board_web || true
+                            
+                            echo '✅ 서버가 배포되었습니다!'
+                            echo '🌐 접속 주소: http://localhost:3000'
+                        fi
                     """
                 }
             }
