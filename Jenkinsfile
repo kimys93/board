@@ -95,6 +95,7 @@ pipeline {
                         """
                         
                         // Web 컨테이너 시작 (테스트용이므로 restart 정책 없음, 호스트 포트 바인딩 없음)
+                        // 테스트 단계에서는 이미지에 포함된 파일 사용 (볼륨 마운트 최소화)
                         sh """
                             # siteAuth.credentials 파일이 존재하는지 확인
                             if [ ! -f siteAuth.credentials ]; then
@@ -106,11 +107,6 @@ pipeline {
                                 --name board_web \\
                                 --network board_network \\
                                 -v \$(pwd)/uploads:/app/uploads \\
-                                -v \$(pwd)/public:/app/public \\
-                                -v \$(pwd)/routes:/app/routes \\
-                                -v \$(pwd)/config:/app/config \\
-                                -v \$(pwd)/middleware:/app/middleware \\
-                                -v \$(pwd)/server.js:/app/server.js \\
                                 -v \$(pwd)/siteAuth.credentials:/app/siteAuth.credentials:ro \\
                                 -e NODE_ENV=development \\
                                 -e DB_HOST=board_db \\
