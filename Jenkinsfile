@@ -183,11 +183,19 @@ pipeline {
                             # 서버 재시작 (새로운 DB로, init.sql 포함)
                             echo '🔄 서버 재시작 중...'
                             # docker-compose 대신 docker run을 사용하여 init.sql을 확실히 마운트
+                            # init.sql 파일 경로 확인
+                            INIT_SQL_PATH=\$(pwd)/database/init.sql
+                            if [ ! -f "\$INIT_SQL_PATH" ]; then
+                                echo "❌ init.sql 파일을 찾을 수 없습니다: \$INIT_SQL_PATH"
+                                exit 1
+                            fi
+                            echo "📄 init.sql 경로: \$INIT_SQL_PATH"
+                            
                             docker run -d \\
                                 --name board_db \\
                                 --network board_network \\
                                 -v board_db_data:/var/lib/mysql \\
-                                -v \$(pwd)/database/init.sql:/docker-entrypoint-initdb.d/init.sql \\
+                                -v "\$INIT_SQL_PATH:/docker-entrypoint-initdb.d/init.sql:ro" \\
                                 -e MYSQL_ROOT_PASSWORD=rootpassword \\
                                 -e MYSQL_DATABASE=board_db \\
                                 -e MYSQL_USER=board_user \\
@@ -201,7 +209,7 @@ pipeline {
                                     --name board_db \\
                                     --network board_network \\
                                     -v board_db_data:/var/lib/mysql \\
-                                    -v \$(pwd)/database/init.sql:/docker-entrypoint-initdb.d/init.sql \\
+                                    -v "\$INIT_SQL_PATH:/docker-entrypoint-initdb.d/init.sql:ro" \\
                                     -e MYSQL_ROOT_PASSWORD=rootpassword \\
                                     -e MYSQL_DATABASE=board_db \\
                                     -e MYSQL_USER=board_user \\
