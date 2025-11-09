@@ -155,8 +155,16 @@ pipeline {
                         docker stop board_web board_db 2>/dev/null || true
                         docker rm -f board_web board_db 2>/dev/null || true
                         
+                        # 포트 해제 대기
+                        sleep 3
+                        
                         # docker-compose로 서버 시작 (jenkins 서비스는 제외)
-                        docker-compose up -d db web
+                        # 포트 충돌 시 재시도
+                        docker-compose up -d db web || {
+                            echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
+                            sleep 5
+                            docker-compose up -d db web
+                        }
                         
                         echo '✅ 서버가 배포되었습니다!'
                         echo '🌐 접속 주소: http://localhost:3000'
