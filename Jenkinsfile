@@ -3,10 +3,10 @@ pipeline {
     
     // 빌드 파라미터 정의
     parameters {
-        booleanParam(
-            name: 'reset_db',
-            defaultValue: false,
-            description: 'DB 데이터를 초기화하고 서버를 재시작합니다. (주의: 모든 데이터가 삭제됩니다!)'
+        choice(
+            name: 'BUILD_TYPE',
+            choices: ['normal', 'reset_db'],
+            description: '빌드 타입 선택: normal(일반 빌드), reset_db(DB 초기화)'
         )
     }
     
@@ -159,8 +159,10 @@ pipeline {
             steps {
                 echo '🚀 서버 배포 중...'
                 script {
-                    // reset_db 파라미터 확인
-                    if (params.reset_db) {
+                    // BUILD_TYPE 파라미터 확인
+                    def buildType = params.BUILD_TYPE ?: 'normal'
+                    
+                    if (buildType == 'reset_db') {
                         echo '⚠️⚠️⚠️ DB 리셋 모드: 모든 데이터가 삭제됩니다! ⚠️⚠️⚠️'
                         sh """
                             # 모든 서버 중지 및 제거
