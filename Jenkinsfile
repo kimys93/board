@@ -229,12 +229,16 @@ pipeline {
                             # init.sql을 컨테이너에 복사하고 실행
                             echo '📄 init.sql 실행 중...'
                             docker cp "\$INIT_SQL_PATH" board_db:/tmp/init.sql
-                            docker exec board_db mysql -u board_user -pboard_password board_db < /tmp/init.sql || {
+                            # docker exec에서 리다이렉션은 작동하지 않으므로 sh -c 사용
+                            docker exec -i board_db sh -c "mysql -u board_user -pboard_password board_db < /tmp/init.sql" || {
                                 echo "⚠️ init.sql 실행 실패, root로 재시도..."
-                                docker exec board_db mysql -u root -prootpassword board_db < /tmp/init.sql || {
-                                    echo "❌ init.sql 실행 실패. 로그 확인:"
-                                    docker logs board_db --tail 50
-                                    exit 1
+                                docker exec -i board_db sh -c "mysql -u root -prootpassword board_db < /tmp/init.sql" || {
+                                    echo "❌ init.sql 실행 실패. 직접 실행 시도..."
+                                    docker exec board_db mysql -u root -prootpassword board_db -e "source /tmp/init.sql" || {
+                                        echo "❌ init.sql 실행 실패. 로그 확인:"
+                                        docker logs board_db --tail 50
+                                        exit 1
+                                    }
                                 }
                             }
                             
