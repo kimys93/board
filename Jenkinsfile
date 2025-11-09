@@ -161,17 +161,22 @@ pipeline {
                     sh """
                         reset_db=${params.reset_db}
                         
-                        if [ "\$reset_db" == "true" ]; then
+                        # Jenkins는 절대 건드리지 않음 - 특정 컨테이너만 제어
+                        echo "🛑 서버 중지 중..."
+                        docker stop board_web board_db 2>/dev/null || true
+                        docker rm -f board_web board_db 2>/dev/null || true
+                        
+                        if [ "\$reset_db" = "true" ]; then
                             echo "⚠️⚠️⚠️ DB 리셋 모드: 모든 데이터가 삭제됩니다! ⚠️⚠️⚠️"
-                            echo "docker 종료 및 DB 초기화"
-                            docker compose down -v
-                        else
-                            echo "docker 종료"
-                            docker compose down
+                            echo "🗑️ DB 볼륨 삭제 중..."
+                            docker volume rm board_db_data 2>/dev/null || echo "⚠️ 볼륨이 이미 삭제되었거나 존재하지 않습니다."
                         fi
                         
-                        # docker 컨테이너 실행
-                        docker compose up -d
+                        # 포트 해제 대기
+                        sleep 2
+                        
+                        # docker 컨테이너 실행 (web, db만)
+                        docker compose up -d web db
                         
                         # siteAuth.credentials 파일을 컨테이너에 복사
                         sleep 3
