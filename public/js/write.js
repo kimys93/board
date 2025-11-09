@@ -156,23 +156,23 @@ async function handleWritePost(e) {
 async function uploadFile(postId, file) {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('postId', postId);
     
     const token = localStorage.getItem('token');
-    const response = await fetch(`/api/upload/${postId}`, {
+    const response = await fetch('/api/upload', {
         method: 'POST',
         headers: {
-            ...(token && { 'Authorization': `Bearer ${token}` })
+            'Authorization': `Bearer ${token}`
         },
         body: formData
     });
     
-    const data = await response.json();
-    
     if (!response.ok) {
-        throw new Error(data.message || '파일 업로드에 실패했습니다.');
+        const error = await response.json();
+        throw new Error(error.message || '파일 업로드에 실패했습니다.');
     }
     
-    return data;
+    return await response.json();
 }
 
 // 뒤로가기
