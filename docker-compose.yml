@@ -36,11 +36,13 @@ services:
       - db
     volumes:
       - ./uploads:/app/uploads
-      - ./public:/app/public
-      - ./routes:/app/routes
-      - ./config:/app/config
-      - ./middleware:/app/middleware
-      - ./server.js:/app/server.js
+      # 개발 환경에서는 코드 변경을 즉시 반영하기 위해 볼륨 마운트 사용
+      # 하지만 Jenkins 빌드에서는 이미지에 포함된 파일 사용 (볼륨 마운트 제거)
+      # - ./public:/app/public
+      # - ./routes:/app/routes
+      # - ./config:/app/config
+      # - ./middleware:/app/middleware
+      # - ./server.js:/app/server.js
       - ./siteAuth.credentials:/app/siteAuth.credentials
     networks:
       - board_network
