@@ -12,13 +12,13 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // 앱 초기화
-function initializeApp() {
+async function initializeApp() {
     const pathParts = window.location.pathname.split('/');
     const postId = parseInt(pathParts[2]);
 
     if (postId) {
         currentPostId = postId;
-        checkAuth();
+        await checkAuth(); // 인증 확인이 완료된 후 게시글 로드
         loadPostDetail(postId);
     } else {
         window.location.href = '/';
@@ -66,10 +66,18 @@ async function loadPostDetail(postId) {
     try {
         console.log('게시글 상세 로드 시작, postId:', postId);
         showLoading(true);
+        
+        // currentUser가 없으면 다시 인증 확인
+        if (!currentUser) {
+            await checkAuth();
+        }
+        
         const response = await apiRequest(`/posts/${postId}`);
         console.log('API 응답:', response);
         const post = response.data;
         console.log('게시글 데이터:', post);
+        console.log('currentUser:', currentUser);
+        console.log('post.author_id:', post.author_id);
         
         document.getElementById('detailTitle').textContent = post.title;
         document.getElementById('detailAuthor').textContent = post.author_name;
@@ -116,6 +124,13 @@ function displayAttachments(attachments) {
 // 상세 페이지 액션 버튼
 function displayDetailActions(authorId) {
     const container = document.getElementById('detailActions');
+    
+    console.log('displayDetailActions 호출:', {
+        currentUser: currentUser,
+        currentUserId: currentUser?.id,
+        authorId: authorId,
+        isMatch: currentUser && currentUser.id === authorId
+    });
     
     if (currentUser && currentUser.id === authorId) {
         container.innerHTML = `
