@@ -170,13 +170,57 @@ pipeline {
                             echo "⚠️⚠️⚠️ DB 리셋 모드: 모든 데이터가 삭제됩니다! ⚠️⚠️⚠️"
                             echo "🗑️ DB 볼륨 삭제 중..."
                             docker volume rm board_db_data 2>/dev/null || echo "⚠️ 볼륨이 이미 삭제되었거나 존재하지 않습니다."
+                            # 볼륨 삭제 후 컨테이너도 완전히 제거 (init.sql 실행을 위해)
+                            docker rm -f board_db 2>/dev/null || true
                         fi
                         
                         # 포트 해제 대기
                         sleep 2
                         
+                        # init.sql 파일 확인
+                        if [ ! -f database/init.sql ]; then
+                            echo "❌ 오류: database/init.sql 파일을 찾을 수 없습니다."
+                            echo "📋 현재 디렉토리: \$(pwd)"
+                            echo "📋 파일 목록:"
+                            ls -la database/ 2>/dev/null || echo "database 디렉토리가 없습니다."
+                            exit 1
+                        fi
+                        
+                        echo "✅ init.sql 파일 확인 완료"
+                        
                         # docker 컨테이너 실행 (web, db만)
                         docker compose up -d web db
+                        
+                        # DB 초기화 대기
+                        echo "⏳ DB 초기화 대기 중..."
+                        sleep 15
+                        timeout 120 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || {
+                            echo "❌ DB 시작 실패. 로그 확인:"
+                            docker logs board_db --tail 50
+                            exit 1
+                        }
+                        
+                        # reset_db일 때 또는 테이블이 없을 때 init.sql 수동 실행
+                        TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
+                        if [ "\$reset_db" = "true" ] || [ "\$TABLE_COUNT" -lt 2 ]; then
+                            echo "📄 init.sql 수동 실행 중..."
+                            docker cp database/init.sql board_db:/tmp/init.sql
+                            docker exec -i board_db sh -c "mysql -u board_user -pboard_password board_db < /tmp/init.sql" || {
+                                echo "⚠️ init.sql 실행 실패, root로 재시도..."
+                                docker exec -i board_db sh -c "mysql -u root -prootpassword board_db < /tmp/init.sql" || {
+                                    echo "❌ init.sql 실행 실패. 로그 확인:"
+                                    docker logs board_db --tail 50
+                                    exit 1
+                                }
+                            }
+                            echo "✅ init.sql 실행 완료"
+                            
+                            # 테이블 확인
+                            TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
+                            echo "📊 생성된 테이블 수: \$TABLE_COUNT"
+                        else
+                            echo "✅ DB 테이블이 이미 존재합니다. (테이블 수: \$TABLE_COUNT)"
+                        fi
                         
                         # siteAuth.credentials 파일을 컨테이너에 복사
                         sleep 3
