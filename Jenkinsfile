@@ -270,12 +270,52 @@ pipeline {
                             # DB가 실행 중인지 확인
                             if ! docker ps --format '{{.Names}}' | grep -q '^board_db\$'; then
                                 echo '📦 DB 서버 시작 중...'
-                                docker-compose up -d db || {
-                                    echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
+                                
+                                # DB 볼륨이 비어있는지 확인 (테이블이 있는지 확인)
+                                DB_VOLUME_EXISTS=\$(docker volume inspect board_db_data 2>/dev/null | grep -q "board_db_data" && echo "true" || echo "false")
+                                
+                                if [ "\$DB_VOLUME_EXISTS" = "false" ]; then
+                                    echo '📦 새로운 DB 볼륨 생성 및 초기화...'
+                                    # docker run으로 DB 생성 (init.sql 실행)
+                                    docker run -d \\
+                                        --name board_db \\
+                                        --network board_network \\
+                                        -v board_db_data:/var/lib/mysql \\
+                                        -v \$(pwd)/database/init.sql:/docker-entrypoint-initdb.d/init.sql \\
+                                        -e MYSQL_ROOT_PASSWORD=rootpassword \\
+                                        -e MYSQL_DATABASE=board_db \\
+                                        -e MYSQL_USER=board_user \\
+                                        -e MYSQL_PASSWORD=board_password \\
+                                        mysql:8.0 \\
+                                        --character-set-server=utf8mb4 \\
+                                        --collation-server=utf8mb4_unicode_ci || {
+                                        echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
+                                        sleep 5
+                                        docker run -d \\
+                                            --name board_db \\
+                                            --network board_network \\
+                                            -v board_db_data:/var/lib/mysql \\
+                                            -v \$(pwd)/database/init.sql:/docker-entrypoint-initdb.d/init.sql \\
+                                            -e MYSQL_ROOT_PASSWORD=rootpassword \\
+                                            -e MYSQL_DATABASE=board_db \\
+                                            -e MYSQL_USER=board_user \\
+                                            -e MYSQL_PASSWORD=board_password \\
+                                            mysql:8.0 \\
+                                            --character-set-server=utf8mb4 \\
+                                            --collation-server=utf8mb4_unicode_ci
+                                    }
+                                    sleep 10
+                                    timeout 60 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || exit 1
+                                else
+                                    echo '📦 기존 DB 볼륨 사용...'
+                                    # 기존 볼륨이 있으면 docker-compose 사용
+                                    docker-compose up -d db || {
+                                        echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
+                                        sleep 5
+                                        docker-compose up -d db
+                                    }
                                     sleep 5
-                                    docker-compose up -d db
-                                }
-                                sleep 5
+                                fi
                             else
                                 echo 'ℹ️ DB 서버가 이미 실행 중입니다.'
                             fi
