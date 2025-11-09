@@ -224,7 +224,21 @@ pipeline {
                         TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
                         if [ "\$reset_db" = "true" ] || [ "\$TABLE_COUNT" -lt 2 ]; then
                             echo "📄 init.sql 수동 실행 중..."
-                            docker cp database/init.sql board_db:/tmp/init.sql
+                            
+                            # 볼륨 마운트된 파일 확인
+                            echo "🔍 볼륨 마운트된 init.sql 확인 중..."
+                            if docker exec board_db test -f /docker-entrypoint-initdb.d/init.sql; then
+                                echo "✅ 볼륨 마운트된 init.sql 파일 발견"
+                                INIT_SQL_PATH="/docker-entrypoint-initdb.d/init.sql"
+                            elif docker exec board_db test -d /docker-entrypoint-initdb.d/init.sql; then
+                                echo "⚠️ /docker-entrypoint-initdb.d/init.sql이 디렉토리로 인식됨. docker cp로 복사 후 사용"
+                                docker cp database/init.sql board_db:/tmp/init.sql
+                                INIT_SQL_PATH="/tmp/init.sql"
+                            else
+                                echo "⚠️ 볼륨 마운트 실패. docker cp로 복사 후 사용"
+                                docker cp database/init.sql board_db:/tmp/init.sql
+                                INIT_SQL_PATH="/tmp/init.sql"
+                            fi
                             
                             # 재시도 로직 추가
                             MAX_SQL_RETRIES=5
@@ -232,7 +246,7 @@ pipeline {
                             SQL_SUCCESS=false
                             
                             while [ \$SQL_RETRY_COUNT -lt \$MAX_SQL_RETRIES ]; do
-                                if docker exec -i board_db sh -c "mysql -u board_user -pboard_password board_db < /tmp/init.sql" 2>/dev/null; then
+                                if docker exec -i board_db sh -c "mysql -u board_user -pboard_password board_db < \$INIT_SQL_PATH" 2>/dev/null; then
                                     SQL_SUCCESS=true
                                     break
                                 fi
@@ -245,7 +259,7 @@ pipeline {
                                 echo "⚠️ board_user로 실패, root로 재시도..."
                                 SQL_RETRY_COUNT=0
                                 while [ \$SQL_RETRY_COUNT -lt \$MAX_SQL_RETRIES ]; do
-                                    if docker exec -i board_db sh -c "mysql -u root -prootpassword board_db < /tmp/init.sql" 2>/dev/null; then
+                                    if docker exec -i board_db sh -c "mysql -u root -prootpassword board_db < \$INIT_SQL_PATH" 2>/dev/null; then
                                         SQL_SUCCESS=true
                                         break
                                     fi
