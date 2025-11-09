@@ -28,6 +28,12 @@ ARG DOCKER_GID=999
 RUN groupadd -g ${DOCKER_GID} docker || true && \
     usermod -aG docker jenkins
 
+# 시스템 전역 Git 설정 (모든 사용자에게 적용)
+RUN git config --system --add safe.directory '*' || \
+    (mkdir -p /etc/gitconfig.d && \
+     echo '[safe]' > /etc/gitconfig.d/safe.conf && \
+     echo '    directory = *' >> /etc/gitconfig.d/safe.conf)
+
 # Git safe.directory 설정을 위한 초기화 스크립트 생성
 # Jenkins 시작 시 자동으로 Git 설정이 적용되도록 함
 RUN mkdir -p /usr/local/bin && \
