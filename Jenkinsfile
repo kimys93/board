@@ -328,9 +328,9 @@ pipeline {
                                             docker cp \$(pwd)/database/init.sql board_db:/tmp/init.sql
                                             docker exec board_db mysql -u board_user -pboard_password board_db < /tmp/init.sql || echo "❌ init.sql 실행 실패"
                                         }
-                                    } else {
+                                    else
                                         echo "✅ DB 테이블이 이미 존재합니다."
-                                    }
+                                    fi
                                 fi
                             else
                                 echo 'ℹ️ DB 서버가 이미 실행 중입니다.'
