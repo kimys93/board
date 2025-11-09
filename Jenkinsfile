@@ -165,11 +165,15 @@ pipeline {
                     if (buildType == 'reset_db') {
                         echo '⚠️⚠️⚠️ DB 리셋 모드: 모든 데이터가 삭제됩니다! ⚠️⚠️⚠️'
                         sh """
-                            # 모든 서버 중지 및 제거
+                            # 모든 서버 중지 및 제거 (Jenkins는 절대 건드리지 않음)
                             echo '🛑 서버 중지 중...'
-                            docker-compose down || true
+                            # docker-compose down은 Jenkins까지 중지하므로 사용하지 않음
                             docker stop board_web board_db 2>/dev/null || true
                             docker rm -f board_web board_db 2>/dev/null || true
+                            
+                            # 네트워크에서 분리 (Jenkins는 제외)
+                            docker network disconnect board_network board_web 2>/dev/null || true
+                            docker network disconnect board_network board_db 2>/dev/null || true
                             
                             # DB 볼륨 삭제 (데이터 초기화)
                             echo '🗑️ DB 볼륨 삭제 중...'
