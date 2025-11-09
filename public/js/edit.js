@@ -12,13 +12,13 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // 앱 초기화
-function initializeApp() {
+async function initializeApp() {
     const pathParts = window.location.pathname.split('/');
     const postId = parseInt(pathParts[2]);
     
     if (postId) {
         currentPostId = postId;
-        checkAuth();
+        await checkAuth(); // 인증 확인이 완료된 후 게시글 로드
         loadPostData(postId);
     } else {
         window.location.href = '/';
@@ -99,11 +99,17 @@ async function apiRequest(url, options = {}) {
 async function loadPostData(postId) {
     try {
         showLoading(true);
+        
+        // currentUser가 없으면 다시 인증 확인
+        if (!currentUser) {
+            await checkAuth();
+        }
+        
         const response = await apiRequest(`/posts/${postId}`);
         const post = response.data;
         
         // 권한 확인
-        if (currentUser.id !== post.author_id) {
+        if (!currentUser || currentUser.id !== post.author_id) {
             showToast('게시글을 수정할 권한이 없습니다.', 'error');
             window.location.href = `/posts/${postId}`;
             return;
