@@ -315,9 +315,35 @@ pipeline {
                                         docker-compose up -d db
                                     }
                                     sleep 5
+                                    
+                                    # DB가 준비될 때까지 대기
+                                    timeout 60 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || exit 1
+                                    
+                                    # 테이블이 있는지 확인
+                                    TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
+                                    if [ "\$TABLE_COUNT" -lt 2 ]; then
+                                        echo '⚠️ DB 테이블이 없습니다. init.sql을 수동으로 실행합니다...'
+                                        docker exec -i board_db mysql -u board_user -pboard_password board_db < \$(pwd)/database/init.sql || {
+                                            echo "⚠️ init.sql 실행 실패, 컨테이너 내부에서 직접 실행 시도..."
+                                            docker cp \$(pwd)/database/init.sql board_db:/tmp/init.sql
+                                            docker exec board_db mysql -u board_user -pboard_password board_db < /tmp/init.sql || echo "❌ init.sql 실행 실패"
+                                        }
+                                    } else {
+                                        echo "✅ DB 테이블이 이미 존재합니다."
+                                    }
                                 fi
                             else
                                 echo 'ℹ️ DB 서버가 이미 실행 중입니다.'
+                                # 실행 중이어도 테이블이 있는지 확인
+                                TABLE_COUNT=\$(docker exec board_db mysql -u board_user -pboard_password board_db -e "SHOW TABLES;" 2>/dev/null | wc -l)
+                                if [ "\$TABLE_COUNT" -lt 2 ]; then
+                                    echo '⚠️ DB 테이블이 없습니다. init.sql을 수동으로 실행합니다...'
+                                    docker exec -i board_db mysql -u board_user -pboard_password board_db < \$(pwd)/database/init.sql || {
+                                        echo "⚠️ init.sql 실행 실패, 컨테이너 내부에서 직접 실행 시도..."
+                                        docker cp \$(pwd)/database/init.sql board_db:/tmp/init.sql
+                                        docker exec board_db mysql -u board_user -pboard_password board_db < /tmp/init.sql || echo "❌ init.sql 실행 실패"
+                                    }
+                                fi
                             fi
                             
                             # Web 서버 시작
