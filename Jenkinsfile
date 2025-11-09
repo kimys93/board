@@ -180,66 +180,23 @@ pipeline {
                             # 포트 해제 대기
                             sleep 3
                             
-                            # 서버 재시작 (새로운 DB로, init.sql 포함)
+                            # 서버 재시작 (docker-compose 사용, init.sql 자동 실행)
                             echo '🔄 서버 재시작 중...'
-                            # init.sql 파일 경로 확인
-                            INIT_SQL_PATH=\$(pwd)/database/init.sql
-                            if [ ! -f "\$INIT_SQL_PATH" ]; then
-                                echo "❌ init.sql 파일을 찾을 수 없습니다: \$INIT_SQL_PATH"
-                                exit 1
-                            fi
-                            echo "📄 init.sql 경로: \$INIT_SQL_PATH"
                             
-                            # DB 컨테이너 시작 (init.sql은 나중에 수동 실행)
-                            docker run -d \\
-                                --name board_db \\
-                                --network board_network \\
-                                -v board_db_data:/var/lib/mysql \\
-                                -e MYSQL_ROOT_PASSWORD=rootpassword \\
-                                -e MYSQL_DATABASE=board_db \\
-                                -e MYSQL_USER=board_user \\
-                                -e MYSQL_PASSWORD=board_password \\
-                                mysql:8.0 \\
-                                --character-set-server=utf8mb4 \\
-                                --collation-server=utf8mb4_unicode_ci || {
+                            # DB 서버 시작 (docker-compose가 init.sql을 자동 실행)
+                            docker-compose up -d db || {
                                 echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
                                 sleep 5
-                                docker run -d \\
-                                    --name board_db \\
-                                    --network board_network \\
-                                    -v board_db_data:/var/lib/mysql \\
-                                    -e MYSQL_ROOT_PASSWORD=rootpassword \\
-                                    -e MYSQL_DATABASE=board_db \\
-                                    -e MYSQL_USER=board_user \\
-                                    -e MYSQL_PASSWORD=board_password \\
-                                    mysql:8.0 \\
-                                    --character-set-server=utf8mb4 \\
-                                    --collation-server=utf8mb4_unicode_ci
+                                docker-compose up -d db
                             }
                             
-                            # DB가 준비될 때까지 대기
-                            echo '⏳ DB 준비 대기 중...'
-                            sleep 10
+                            # DB 초기화 대기
+                            echo '⏳ DB 초기화 대기 중...'
+                            sleep 15
                             timeout 120 bash -c 'until docker exec board_db mysqladmin ping -h localhost --silent; do sleep 2; done' || {
                                 echo "❌ DB 시작 실패. 로그 확인:"
                                 docker logs board_db --tail 50
                                 exit 1
-                            }
-                            
-                            # init.sql을 컨테이너에 복사하고 실행
-                            echo '📄 init.sql 실행 중...'
-                            docker cp "\$INIT_SQL_PATH" board_db:/tmp/init.sql
-                            # docker exec에서 리다이렉션은 작동하지 않으므로 sh -c 사용
-                            docker exec -i board_db sh -c "mysql -u board_user -pboard_password board_db < /tmp/init.sql" || {
-                                echo "⚠️ init.sql 실행 실패, root로 재시도..."
-                                docker exec -i board_db sh -c "mysql -u root -prootpassword board_db < /tmp/init.sql" || {
-                                    echo "❌ init.sql 실행 실패. 직접 실행 시도..."
-                                    docker exec board_db mysql -u root -prootpassword board_db -e "source /tmp/init.sql" || {
-                                        echo "❌ init.sql 실행 실패. 로그 확인:"
-                                        docker logs board_db --tail 50
-                                        exit 1
-                                    }
-                                }
                             }
                             
                             # 테이블이 생성되었는지 확인
@@ -254,33 +211,11 @@ pipeline {
                                 echo "✅ DB 테이블이 정상적으로 생성되었습니다. (테이블 수: \$TABLE_COUNT)"
                             fi
                             
-                            # Web 서버 시작 (docker-compose 대신 docker run 사용, DB는 이미 실행 중)
-                            docker run -d \\
-                                --name board_web \\
-                                --network board_network \\
-                                -p 0.0.0.0:3000:3000 \\
-                                -v \$(pwd)/uploads:/app/uploads \\
-                                -e NODE_ENV=development \\
-                                -e DB_HOST=board_db \\
-                                -e DB_USER=board_user \\
-                                -e DB_PASSWORD=board_password \\
-                                -e DB_NAME=board_db \\
-                                -e JWT_SECRET=your_jwt_secret_key_here \\
-                                board-web:latest || {
+                            # Web 서버 시작
+                            docker-compose up -d web || {
                                 echo "⚠️ 첫 번째 시도 실패, 잠시 대기 후 재시도..."
                                 sleep 5
-                                docker run -d \\
-                                    --name board_web \\
-                                    --network board_network \\
-                                    -p 0.0.0.0:3000:3000 \\
-                                    -v \$(pwd)/uploads:/app/uploads \\
-                                    -e NODE_ENV=development \\
-                                    -e DB_HOST=board_db \\
-                                    -e DB_USER=board_user \\
-                                    -e DB_PASSWORD=board_password \\
-                                    -e DB_NAME=board_db \\
-                                    -e JWT_SECRET=your_jwt_secret_key_here \\
-                                    board-web:latest
+                                docker-compose up -d web
                             }
                             
                             # siteAuth.credentials 파일을 컨테이너에 복사
