@@ -42,11 +42,15 @@ pipeline {
                 script {
                     def resetDb = params.reset_db
                     
+                    // 기존 컨테이너 강제 정리
+                    bat "docker stop board_web board_db 2>nul || echo."
+                    bat "docker rm -f board_web board_db 2>nul || echo."
+                    
                     if (resetDb) {
                         echo '⚠️⚠️⚠️ DB 리셋 모드: 모든 데이터가 삭제됩니다! ⚠️⚠️⚠️'
-                        bat "docker compose -f ${DOCKER_COMPOSE_FILE} down -v"
+                        bat "docker compose -f ${DOCKER_COMPOSE_FILE} down -v --remove-orphans"
                     } else {
-                        bat "docker compose -f ${DOCKER_COMPOSE_FILE} down"
+                        bat "docker compose -f ${DOCKER_COMPOSE_FILE} down --remove-orphans"
                     }
                     
                     bat "docker compose -f ${DOCKER_COMPOSE_FILE} up -d"
