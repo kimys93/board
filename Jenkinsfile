@@ -5,7 +5,7 @@ pipeline {
         booleanParam(
             name: 'reset_db',
             defaultValue: false,
-            description: 'DB 데이터를 초기화하고 서버를 재시작합니다. (주의: 모든 데이터가 삭제됩니다!)'
+            description: 'Reset database and restart server (WARNING: All data will be deleted!)'
         )
     }
     
