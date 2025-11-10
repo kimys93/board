@@ -20,12 +20,12 @@ pipeline {
         stage('Setup') {
             steps {
                 script {
-                    // siteAuth.credentials 파일 생성
+                    // Create siteAuth.credentials file
                     if (!fileExists('siteAuth.credentials')) {
                         writeFile file: 'siteAuth.credentials', text: "SITE_ID=${env.SITE_ID}\nSITE_PW=${env.SITE_PW}\n"
-                        echo '✅ siteAuth.credentials 파일을 생성했습니다.'
+                        echo 'siteAuth.credentials file created.'
                     } else {
-                        echo 'ℹ️ siteAuth.credentials 파일이 이미 존재합니다.'
+                        echo 'siteAuth.credentials file already exists.'
                     }
                 }
             }
@@ -42,11 +42,11 @@ pipeline {
                 script {
                     def resetDb = params.reset_db
                     
-                    // 기존 컨테이너 강제 정리
+                    // Clean up existing containers
                     bat "@echo off & docker stop board_web board_db 2>nul & docker rm -f board_web board_db 2>nul & echo."
                     
                     if (resetDb) {
-                        echo '⚠️⚠️⚠️ DB 리셋 모드: 모든 데이터가 삭제됩니다! ⚠️⚠️⚠️'
+                        echo 'WARNING: DB reset mode - All data will be deleted!'
                         bat "docker compose -f ${DOCKER_COMPOSE_FILE} down -v --remove-orphans"
                     } else {
                         bat "docker compose -f ${DOCKER_COMPOSE_FILE} down --remove-orphans"
@@ -54,13 +54,13 @@ pipeline {
                     
                     bat "docker compose -f ${DOCKER_COMPOSE_FILE} up -d"
                     
-                    // siteAuth.credentials 파일을 컨테이너에 복사
+                    // Copy siteAuth.credentials file to container
                     sleep time: 3, unit: 'SECONDS'
                     bat '@echo off & docker cp siteAuth.credentials board_web:/app/siteAuth.credentials 2>nul & echo.'
                     bat '@echo off & docker restart board_web 2>nul & echo.'
                     
-                    // 서버 상태 확인
-                    echo '⏳ 서버 시작 대기 중...'
+                    // Check server status
+                    echo 'Waiting for server to start...'
                     def status = ''
                     def maxRetries = 10
                     def retryDelay = 3
@@ -76,21 +76,21 @@ pipeline {
                         }
                         
                         if (status == '200' || status == '401') {
-                            echo "✅ 서버가 정상적으로 시작되었습니다. (상태 코드: ${status})"
+                            echo "Server started successfully. (Status code: ${status})"
                             break
                         } else {
-                            echo "⏳ 서버가 아직 준비되지 않았습니다. ${retryDelay}초 후 재시도... (시도 ${i + 1}/${maxRetries})"
+                            echo "Server not ready yet. Retrying in ${retryDelay} seconds... (Attempt ${i + 1}/${maxRetries})"
                             sleep time: retryDelay, unit: 'SECONDS'
                         }
                     }
                     
                     if (status != '200' && status != '401') {
-                        echo "⚠️ 서버 상태 확인 실패 (상태 코드: ${status})"
+                        echo "Server status check failed. (Status code: ${status})"
                         bat 'docker logs board_web --tail 30'
                     }
                     
-                    echo '✅ 배포 완료!'
-                    echo '🌐 접속 주소: http://localhost:3000'
+                    echo 'Deployment completed!'
+                    echo 'Access URL: http://localhost:3000'
                 }
             }
         }
@@ -102,10 +102,10 @@ pipeline {
             bat '@echo off & docker logs --tail=50 board_db 2>nul & echo.'
         }
         success {
-            echo '✅ 빌드 성공!'
+            echo 'Build successful!'
         }
         failure {
-            echo '❌ 빌드 실패!'
+            echo 'Build failed!'
         }
     }
 }
