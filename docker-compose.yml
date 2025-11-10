@@ -1,19 +1,16 @@
 services:
-  # MySQL 데이터베이스
   db:
     image: mysql:8.0
     container_name: board_db
-    restart: always
+    restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: board_db
       MYSQL_USER: board_user
       MYSQL_PASSWORD: board_password
-    # ports:
-      # - "3306:3306"  # Windows 포트 권한 문제로 호스트 포트 바인딩 제거 (컨테이너 간 통신만 사용)
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     volumes:
-      - db_data:/var/lib/mysql
+      - board_db_data:/var/lib/mysql
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
@@ -23,13 +20,12 @@ services:
     networks:
       - board_network
 
-  # Node.js 웹 서버
   web:
     build: .
     container_name: board_web
-    restart: always
+    restart: unless-stopped
     ports:
-      - "0.0.0.0:3000:3000"  # 모든 인터페이스에서 접근 가능하도록 설정
+      - "3000:3000"
     environment:
       - NODE_ENV=development
       - DB_HOST=db
@@ -42,19 +38,12 @@ services:
         condition: service_healthy
     volumes:
       - ./uploads:/app/uploads
-      # 개발 환경에서는 코드 변경을 즉시 반영하기 위해 볼륨 마운트 사용
-      # 하지만 Jenkins 빌드에서는 이미지에 포함된 파일 사용 (볼륨 마운트 제거)
-      # - ./public:/app/public
-      # - ./routes:/app/routes
-      # - ./config:/app/config
-      # - ./middleware:/app/middleware
-      # - ./server.js:/app/server.js
-      # siteAuth.credentials는 docker cp로 복사 (볼륨 마운트 제거)
     networks:
       - board_network
 
 volumes:
-  db_data:
+  board_db_data:
+    driver: local
 
 networks:
   board_network:
