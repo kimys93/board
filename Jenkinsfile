@@ -43,8 +43,7 @@ pipeline {
                     def resetDb = params.reset_db
                     
                     // 기존 컨테이너 강제 정리
-                    bat "docker stop board_web board_db 2>nul || echo."
-                    bat "docker rm -f board_web board_db 2>nul || echo."
+                    bat "@echo off & docker stop board_web board_db 2>nul & docker rm -f board_web board_db 2>nul & echo."
                     
                     if (resetDb) {
                         echo '⚠️⚠️⚠️ DB 리셋 모드: 모든 데이터가 삭제됩니다! ⚠️⚠️⚠️'
@@ -57,8 +56,8 @@ pipeline {
                     
                     // siteAuth.credentials 파일을 컨테이너에 복사
                     sleep time: 3, unit: 'SECONDS'
-                    bat 'docker cp siteAuth.credentials board_web:/app/siteAuth.credentials || echo.'
-                    bat 'docker restart board_web || echo.'
+                    bat '@echo off & docker cp siteAuth.credentials board_web:/app/siteAuth.credentials 2>nul & echo.'
+                    bat '@echo off & docker restart board_web 2>nul & echo.'
                     
                     // 서버 상태 확인
                     echo '⏳ 서버 시작 대기 중...'
@@ -67,7 +66,14 @@ pipeline {
                     def retryDelay = 3
                     
                     for (int i = 0; i < maxRetries; i++) {
-                        status = bat(script: "curl -o nul -s -w \"%%{http_code}\" http://localhost:${SERVICE_PORT} || echo 000", returnStdout: true).trim()
+                        try {
+                            status = bat(script: "curl -o nul -s -w \"%%{http_code}\" http://localhost:${SERVICE_PORT} 2>nul", returnStdout: true).trim()
+                            if (!status || status.isEmpty()) {
+                                status = '000'
+                            }
+                        } catch (Exception e) {
+                            status = '000'
+                        }
                         
                         if (status == '200' || status == '401') {
                             echo "✅ 서버가 정상적으로 시작되었습니다. (상태 코드: ${status})"
@@ -92,8 +98,8 @@ pipeline {
     
     post {
         always {
-            bat 'docker logs --tail=50 board_web 2>nul || echo.'
-            bat 'docker logs --tail=50 board_db 2>nul || echo.'
+            bat '@echo off & docker logs --tail=50 board_web 2>nul & echo.'
+            bat '@echo off & docker logs --tail=50 board_db 2>nul & echo.'
         }
         success {
             echo '✅ 빌드 성공!'
