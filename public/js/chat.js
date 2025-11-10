@@ -4,6 +4,8 @@ let currentRoomId = null;
 let currentOtherUser = null;
 let chatRooms = [];
 let searchResults = [];
+let displayedMessageIds = new Set(); // 이미 표시된 메시지 ID 추적
+let websocketSetup = false; // WebSocket 이벤트 리스너 중복 등록 방지
 
 // 페이지 로드 시 초기화
 document.addEventListener('DOMContentLoaded', function() {
@@ -330,6 +332,9 @@ function selectChatRoom(roomId, otherUserId, otherUserName, otherUserUserId, isO
     // 전역 변수에 현재 채팅방 ID 저장 (알림 처리 시 사용)
     window.currentChatRoomId = roomId;
     
+    // 채팅방이 변경되면 표시된 메시지 ID 초기화
+    displayedMessageIds.clear();
+    
     currentOtherUser = {
         id: otherUserId,
         name: otherUserName,
@@ -411,8 +416,15 @@ async function loadMessages() {
 function displayMessages(messages) {
     const container = document.getElementById('chatMessages');
     
-    container.innerHTML = messages.map(message => `
-        <div class="message-item ${message.sender_id === currentUser.id ? 'message-sent' : 'message-received'}">
+    // 현재 채팅방의 표시된 메시지 ID 초기화
+    displayedMessageIds.clear();
+    
+    container.innerHTML = messages.map(message => {
+        // 메시지 ID를 Set에 추가
+        displayedMessageIds.add(message.id);
+        
+        return `
+        <div class="message-item ${message.sender_id === currentUser.id ? 'message-sent' : 'message-received'}" data-message-id="${message.id}">
             <div class="message-bubble">
                 ${message.message}
             </div>
@@ -420,7 +432,8 @@ function displayMessages(messages) {
                 ${formatMessageTime(message.created_at)}
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
     
     // 스크롤을 맨 아래로
     container.scrollTop = container.scrollHeight;
@@ -484,6 +497,10 @@ async function updateOnlineStatus(isOnline) {
 
 // WebSocket 연결 설정 (NavBar에서 전역으로 처리하므로 여기서는 이벤트 리스너만 설정)
 function setupWebSocket() {
+    // 이미 설정되었으면 중복 등록 방지
+    if (websocketSetup) return;
+    websocketSetup = true;
+    
     // 전역 상태 변경 이벤트 수신
     window.addEventListener('userStatusChange', function(event) {
         handleUserStatusChange(event.detail);
@@ -517,9 +534,18 @@ function addMessageToUI(message) {
     const container = document.getElementById('chatMessages');
     if (!container) return;
     
+    // 이미 표시된 메시지인지 확인 (중복 방지)
+    if (displayedMessageIds.has(message.id)) {
+        console.log('이미 표시된 메시지입니다:', message.id);
+        return;
+    }
+    
+    // 메시지 ID를 Set에 추가
+    displayedMessageIds.add(message.id);
+    
     const isOwnMessage = message.user_id === currentUser.id;
     const messageHTML = `
-        <div class="message-item ${isOwnMessage ? 'message-sent' : 'message-received'}">
+        <div class="message-item ${isOwnMessage ? 'message-sent' : 'message-received'}" data-message-id="${message.id}">
             <div class="message-bubble">
                 ${message.content}
             </div>

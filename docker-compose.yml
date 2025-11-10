@@ -38,6 +38,13 @@ services:
         condition: service_healthy
     volumes:
       - ./uploads:/app/uploads
+      - ./siteAuth.credentials:/app/siteAuth.credentials
+      - ./public:/app/public
+      - ./config:/app/config
+      - ./middleware:/app/middleware
+      - ./routes:/app/routes
+      - ./server.js:/app/server.js
+      - ./package.json:/app/package.json
     networks:
       - board_network
 
