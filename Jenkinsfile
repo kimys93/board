@@ -54,10 +54,8 @@ pipeline {
                     
                     bat "docker compose -f ${DOCKER_COMPOSE_FILE} up -d"
                     
-                    // Copy siteAuth.credentials file to container
+                    // Wait for containers to start
                     sleep time: 3, unit: 'SECONDS'
-                    bat '@echo off & docker cp siteAuth.credentials board_web:/app/siteAuth.credentials 2>nul & echo.'
-                    bat '@echo off & docker restart board_web 2>nul & echo.'
                     
                     // Check server status
                     echo 'Waiting for server to start...'
