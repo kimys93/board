@@ -2,8 +2,46 @@
 
 ## 기본 정보
 - **Base URL**: `http://localhost:3000/api`
-- **인증**: JWT 토큰 (Bearer Token)
+- **사이트 접속 인증**: HTTP Basic Authentication (모든 API 필수)
+- **JWT 토큰**: Bearer Token (일부 API 추가 필요)
 - **Content-Type**: `application/json` (파일 업로드 제외)
+
+## ⚠️ 중요: 인증 방법
+
+### HTTP Basic Authentication (필수 - 모든 API)
+모든 API 요청에 HTTP Basic Authentication이 필요합니다.
+
+**설정 방법**:
+- **ID**: `kimys` (siteAuth.credentials 파일의 SITE_ID 값)
+- **Password**: `L0veyUsung!@` (siteAuth.credentials 파일의 SITE_PW 값)
+
+**cURL 예시**:
+```bash
+curl -u kimys:L0veyUsung!@ http://localhost:3000/api/auth/register
+```
+
+**Postman 설정**:
+1. Authorization 탭 → Type: Basic Auth
+2. Username: `kimys`
+3. Password: `L0veyUsung!@`
+
+**JavaScript (fetch) 예시**:
+```javascript
+const credentials = btoa('kimys:L0veyUsung!@');
+fetch('http://localhost:3000/api/auth/register', {
+    headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/json'
+    }
+});
+```
+
+### JWT 토큰 (선택 - 일부 API)
+로그인 후 받은 JWT 토큰을 일부 API에 추가로 포함해야 합니다.
+
+**주의**: 
+- HTTP Basic Authentication은 쿠키로 자동 처리됨 (브라우저)
+- API 요청 시 JWT 토큰만 헤더에 포함하면 됨
 
 ---
 
@@ -12,7 +50,13 @@
 ### 1.1 회원가입
 **POST** `/api/auth/register`
 
-**Headers**: 없음
+**Headers**:
+```
+Authorization: Basic {base64_encoded_credentials}
+Content-Type: application/json
+```
+
+**참고**: HTTP Basic Authentication 필요 (JWT 토큰 불필요)
 
 **Body**:
 ```json
@@ -71,7 +115,13 @@
 ### 1.2 ID 중복 확인
 **POST** `/api/auth/check-id`
 
-**Headers**: 없음
+**Headers**:
+```
+Authorization: Basic {base64_encoded_credentials}
+Content-Type: application/json
+```
+
+**참고**: HTTP Basic Authentication 필요 (JWT 토큰 불필요)
 
 **Body**:
 ```json
@@ -117,7 +167,13 @@
 ### 1.3 이메일 중복 확인
 **POST** `/api/auth/check-email`
 
-**Headers**: 없음
+**Headers**:
+```
+Authorization: Basic {base64_encoded_credentials}
+Content-Type: application/json
+```
+
+**참고**: HTTP Basic Authentication 필요 (JWT 토큰 불필요)
 
 **Body**:
 ```json
@@ -163,7 +219,13 @@
 ### 1.4 로그인
 **POST** `/api/auth/login`
 
-**Headers**: 없음
+**Headers**:
+```
+Authorization: Basic {base64_encoded_credentials}
+Content-Type: application/json
+```
+
+**참고**: HTTP Basic Authentication 필요 (JWT 토큰 불필요)
 
 **Body**:
 ```json
@@ -227,8 +289,10 @@
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
+
+**참고**: HTTP Basic Authentication (쿠키) + JWT 토큰 필요
 
 **성공 응답** (200):
 ```json
@@ -273,7 +337,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **성공 응답** (200):
@@ -319,7 +383,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **성공 응답** (200):
@@ -377,7 +441,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 Content-Type: multipart/form-data (프로필 이미지 포함 시)
 또는
 Content-Type: application/json (프로필 이미지 없을 시)
@@ -441,7 +505,7 @@ profile_image: [파일]
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Body**:
@@ -499,7 +563,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Body**:
@@ -556,7 +620,12 @@ Authorization: Bearer {token}
 ### 2.1 게시글 목록 조회
 **GET** `/api/posts`
 
-**Headers**: 없음
+**Headers**:
+```
+Authorization: Basic {base64_encoded_credentials}
+```
+
+**참고**: HTTP Basic Authentication 필요 (JWT 토큰 불필요)
 
 **Query Parameters**:
 - `page` (optional): 페이지 번호 (기본값: 1)
@@ -613,7 +682,12 @@ GET /api/posts?search=홍길동&searchType=author
 ### 2.2 게시글 상세 조회
 **GET** `/api/posts/:id`
 
-**Headers**: 없음
+**Headers**:
+```
+Authorization: Basic {base64_encoded_credentials}
+```
+
+**참고**: HTTP Basic Authentication 필요 (JWT 토큰 불필요)
 
 **Path Parameters**:
 - `id`: 게시글 ID
@@ -672,7 +746,7 @@ GET /api/posts/1
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Body**:
@@ -730,7 +804,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Path Parameters**:
@@ -806,7 +880,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Path Parameters**:
@@ -866,7 +940,7 @@ DELETE /api/posts/1
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Body**:
@@ -926,7 +1000,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Path Parameters**:
@@ -992,7 +1066,12 @@ Authorization: Bearer {token}
 ### 3.3 댓글 목록 조회
 **GET** `/api/comments/:postId`
 
-**Headers**: 없음
+**Headers**:
+```
+Authorization: Basic {base64_encoded_credentials}
+```
+
+**참고**: HTTP Basic Authentication 필요 (JWT 토큰 불필요)
 
 **Path Parameters**:
 - `postId`: 게시글 ID
@@ -1047,7 +1126,7 @@ GET /api/comments/1?page=1&limit=10
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Path Parameters**:
@@ -1122,7 +1201,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Path Parameters**:
@@ -1182,7 +1261,7 @@ DELETE /api/comments/1
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Query Parameters**:
@@ -1233,7 +1312,7 @@ GET /api/chat/search?query=홍길동
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **성공 응답** (200):
@@ -1281,7 +1360,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Body**:
@@ -1343,7 +1422,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Path Parameters**:
@@ -1402,7 +1481,7 @@ GET /api/chat/messages/1
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Body**:
@@ -1477,7 +1556,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **성공 응답** (200):
@@ -1511,7 +1590,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **성공 응답** (200):
@@ -1564,7 +1643,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **성공 응답** (200):
@@ -1607,7 +1686,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Body**:
@@ -1674,7 +1753,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Path Parameters**:
@@ -1716,7 +1795,7 @@ PUT /api/notifications/1/read
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **성공 응답** (200):
@@ -1750,7 +1829,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **성공 응답** (200):
@@ -1784,7 +1863,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Path Parameters**:
@@ -1834,7 +1913,7 @@ DELETE /api/notifications/1
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Body**:
@@ -1878,7 +1957,7 @@ Authorization: Bearer {token}
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 Content-Type: multipart/form-data
 ```
 
@@ -2011,7 +2090,7 @@ GET /api/upload/file-1234567890.jpg
 
 **Headers**:
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 ```
 
 **Path Parameters**:
@@ -2083,7 +2162,7 @@ DELETE /api/upload/1
 3. **게시글 작성**
    ```bash
    POST /api/posts
-   Headers: Authorization: Bearer {token}
+   Headers: Authorization: Bearer {jwt_token}
    Body: {"title": "테스트 게시글", "content": "테스트 내용입니다."}
    ```
 
@@ -2093,14 +2172,14 @@ DELETE /api/upload/1
 1. **댓글 작성** (다른 사용자로 로그인)
    ```bash
    POST /api/comments
-   Headers: Authorization: Bearer {token}
+   Headers: Authorization: Bearer {jwt_token}
    Body: {"post_id": 1, "content": "댓글입니다."}
    ```
 
 2. **알림 확인** (게시글 작성자로 로그인)
    ```bash
    GET /api/notifications
-   Headers: Authorization: Bearer {token}
+   Headers: Authorization: Bearer {jwt_token}
    ```
 
 ---
@@ -2109,20 +2188,20 @@ DELETE /api/upload/1
 1. **사용자 검색**
    ```bash
    GET /api/chat/search?query=사용자
-   Headers: Authorization: Bearer {token}
+   Headers: Authorization: Bearer {jwt_token}
    ```
 
 2. **채팅방 생성**
    ```bash
    POST /api/chat/room
-   Headers: Authorization: Bearer {token}
+   Headers: Authorization: Bearer {jwt_token}
    Body: {"otherUserId": 2}
    ```
 
 3. **메시지 전송**
    ```bash
    POST /api/chat/message
-   Headers: Authorization: Bearer {token}
+   Headers: Authorization: Bearer {jwt_token}
    Body: {"roomId": 1, "message": "안녕하세요!"}
    ```
 
