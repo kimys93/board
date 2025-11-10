@@ -196,6 +196,84 @@ docker-compose up -d db
 npm run dev
 ```
 
+## 🚀 CI/CD 설정 (Jenkins)
+
+### Jenkins 서버 구성
+
+이 프로젝트는 Jenkins를 사용한 CI/CD 파이프라인을 지원합니다.
+
+#### 1. Jenkins Credentials 설정
+
+Jenkins에서 빌드 파이프라인을 실행하기 전에 다음 Credentials를 설정해야 합니다:
+
+1. **Jenkins 관리** → **Credentials** → **System** → **Global credentials** 이동
+
+2. **Add Credentials** 클릭하여 다음 두 개의 Credentials를 생성:
+
+   **첫 번째 Credential (SITE_ID용):**
+   - **Kind**: Secret text
+   - **Scope**: Global
+   - **Secret**: `ID`
+   - **ID**: `site-auth-id` (반드시 이 ID를 사용해야 함)
+   - **Description**: Site authentication ID
+
+   **두 번째 Credential (SITE_PW용):**
+   - **Kind**: Secret text
+   - **Scope**: Global
+   - **Secret**: `password`
+   - **ID**: `site-auth-pw` (반드시 이 ID를 사용해야 함)
+   - **Description**: Site authentication Password
+
+3. **OK** 클릭하여 저장
+
+> ⚠️ **중요**: 
+> - Credentials ID는 반드시 `site-auth-id`와 `site-auth-pw`로 설정해야 합니다.
+> - Jenkinsfile에서 이 ID를 사용하여 credentials를 참조합니다.
+> - Secret 값은 실제 사용할 SITE_ID와 SITE_PW로 변경하세요.
+
+#### 2. Jenkins Pipeline 프로젝트 생성
+
+1. **새 Item** 클릭
+2. **Pipeline** 선택
+3. **Pipeline definition**에서 **Pipeline script from SCM** 선택
+4. **SCM**에서 **Git** 선택
+5. **Repository URL**에 Git 저장소 URL 입력
+6. **Credentials**에 Git 접근용 credentials 설정 (필요한 경우)
+7. **Script Path**에 `Jenkinsfile` 입력
+8. **Save** 클릭
+
+#### 3. 빌드 파라미터
+
+Pipeline에는 다음 파라미터가 포함되어 있습니다:
+
+- **reset_db**: DB 데이터를 초기화하고 서버를 재시작합니다 (기본값: false)
+  - `true`로 설정하면 모든 데이터가 삭제됩니다!
+
+#### 4. 빌드 실행
+
+1. 프로젝트 페이지에서 **Build with Parameters** 클릭
+2. **reset_db** 옵션 선택 (필요한 경우)
+3. **Build** 클릭
+
+#### 5. 빌드 단계
+
+Pipeline은 다음 단계로 구성되어 있습니다:
+
+1. **Setup**: `siteAuth.credentials` 파일 생성
+2. **Build**: Docker 이미지 빌드
+3. **Deploy**: 컨테이너 배포 및 서버 상태 확인
+
+#### 6. 배포 확인
+
+빌드가 성공하면 다음 주소에서 서버에 접속할 수 있습니다:
+
+- **웹 애플리케이션**: http://localhost:3000
+- **Jenkins**: http://localhost:8080
+
+> 💡 **팁**: 
+> - 빌드 실패 시 Jenkins 콘솔 출력에서 오류 메시지를 확인하세요.
+> - Docker 컨테이너가 이미 실행 중인 경우 충돌이 발생할 수 있습니다. 이 경우 기존 컨테이너를 정리한 후 다시 빌드하세요.
+
 ### 데이터베이스 접속
 
 ```bash
