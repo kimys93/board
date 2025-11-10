@@ -12,22 +12,22 @@
 모든 API 요청에 HTTP Basic Authentication이 필요합니다.
 
 **설정 방법**:
-- **ID**: `kimys` (siteAuth.credentials 파일의 SITE_ID 값)
-- **Password**: `L0veyUsung!@` (siteAuth.credentials 파일의 SITE_PW 값)
+- **ID**: `test` (siteAuth.credentials 파일의 SITE_ID 값)
+- **Password**: `test` (siteAuth.credentials 파일의 SITE_PW 값)
 
 **cURL 예시**:
 ```bash
-curl -u kimys:L0veyUsung!@ http://localhost:3000/api/auth/register
+curl -u test:test http://localhost:3000/api/auth/register
 ```
 
 **Postman 설정**:
 1. Authorization 탭 → Type: Basic Auth
-2. Username: `kimys`
-3. Password: `L0veyUsung!@`
+2. Username: `test`
+3. Password: `test`
 
 **JavaScript (fetch) 예시**:
 ```javascript
-const credentials = btoa('kimys:L0veyUsung!@');
+const credentials = btoa('test:test');
 fetch('http://localhost:3000/api/auth/register', {
     headers: {
         'Authorization': `Basic ${credentials}`,
