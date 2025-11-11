@@ -2,46 +2,32 @@
 
 ## 기본 정보
 - **Base URL**: `http://localhost:3000/api`
-- **사이트 접속 인증**: HTTP Basic Authentication (모든 API 필수)
-- **JWT 토큰**: Bearer Token (일부 API 추가 필요)
+- **JWT 토큰**: Bearer Token (일부 API 필요)
 - **Content-Type**: `application/json` (파일 업로드 제외)
 
 ## ⚠️ 중요: 인증 방법
 
-### HTTP Basic Authentication (필수 - 모든 API)
-모든 API 요청에 HTTP Basic Authentication이 필요합니다.
-
-**설정 방법**:
-- **ID**: `test` (siteAuth.credentials 파일의 SITE_ID 값)
-- **Password**: `test` (siteAuth.credentials 파일의 SITE_PW 값)
+### JWT 토큰 (일부 API 필요)
+로그인 후 받은 JWT 토큰을 일부 API에 포함해야 합니다.
 
 **cURL 예시**:
 ```bash
-curl -u test:test http://localhost:3000/api/auth/register
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" http://localhost:3000/api/posts
 ```
 
 **Postman 설정**:
-1. Authorization 탭 → Type: Basic Auth
-2. Username: `test`
-3. Password: `test`
+1. Authorization 탭 → Type: Bearer Token
+2. Token: 로그인 API에서 받은 JWT 토큰 입력
 
 **JavaScript (fetch) 예시**:
 ```javascript
-const credentials = btoa('test:test');
-fetch('http://localhost:3000/api/auth/register', {
+fetch('http://localhost:3000/api/posts', {
     headers: {
-        'Authorization': `Basic ${credentials}`,
+        'Authorization': `Bearer ${jwtToken}`,
         'Content-Type': 'application/json'
     }
 });
 ```
-
-### JWT 토큰 (선택 - 일부 API)
-로그인 후 받은 JWT 토큰을 일부 API에 추가로 포함해야 합니다.
-
-**주의**: 
-- HTTP Basic Authentication은 쿠키로 자동 처리됨 (브라우저)
-- API 요청 시 JWT 토큰만 헤더에 포함하면 됨
 
 ---
 
@@ -52,11 +38,10 @@ fetch('http://localhost:3000/api/auth/register', {
 
 **Headers**:
 ```
-Authorization: Basic {base64_encoded_credentials}
 Content-Type: application/json
 ```
 
-**참고**: HTTP Basic Authentication 필요 (JWT 토큰 불필요)
+**참고**: JWT 토큰 불필요 (회원가입 API는 인증 없이 호출 가능)
 
 **Body**:
 ```json
@@ -117,11 +102,10 @@ Content-Type: application/json
 
 **Headers**:
 ```
-Authorization: Basic {base64_encoded_credentials}
 Content-Type: application/json
 ```
 
-**참고**: HTTP Basic Authentication 필요 (JWT 토큰 불필요)
+**참고**: JWT 토큰 불필요 (중복 확인 API는 인증 없이 호출 가능)
 
 **Body**:
 ```json
@@ -169,11 +153,10 @@ Content-Type: application/json
 
 **Headers**:
 ```
-Authorization: Basic {base64_encoded_credentials}
 Content-Type: application/json
 ```
 
-**참고**: HTTP Basic Authentication 필요 (JWT 토큰 불필요)
+**참고**: JWT 토큰 불필요 (중복 확인 API는 인증 없이 호출 가능)
 
 **Body**:
 ```json
@@ -221,11 +204,10 @@ Content-Type: application/json
 
 **Headers**:
 ```
-Authorization: Basic {base64_encoded_credentials}
 Content-Type: application/json
 ```
 
-**참고**: HTTP Basic Authentication 필요 (JWT 토큰 불필요)
+**참고**: JWT 토큰 불필요 (로그인 API는 인증 없이 호출 가능)
 
 **Body**:
 ```json
@@ -240,12 +222,87 @@ Content-Type: application/json
 {
   "success": true,
   "message": "로그인 성공",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoiaG9uZyIsImlhdCI6MTY0MDAwMDAwMCwiZXhwIjoxNjQwMDg2NDAwfQ.abc123...",
   "user": {
     "id": 1,
     "username": "홍길동",
     "email": "test@example.com"
   }
+}
+```
+
+**⚠️ 중요: Bearer Token 받기**
+
+로그인 성공 시 응답의 `token` 필드에 JWT 토큰이 포함됩니다. 이 토큰을 저장하고 이후 API 호출 시 사용해야 합니다.
+
+**cURL 예시**:
+```bash
+# 1. 로그인 요청
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"test1","password":"test1234"}'
+
+# 응답에서 token 값을 복사한 후:
+# 2. 토큰을 사용하여 다른 API 호출 (예: 게시글 목록)
+curl -X GET http://localhost:3000/api/posts \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**Postman 예시**:
+1. **로그인 요청**:
+   - Method: POST
+   - URL: `http://localhost:3000/api/auth/login`
+   - Body (raw JSON):
+     ```json
+     {
+       "username": "test1",
+       "password": "test1234"
+     }
+     ```
+   - Send 클릭 후 응답에서 `token` 값 복사
+
+2. **다른 API 요청** (예: 게시글 목록):
+   - Method: GET
+   - URL: `http://localhost:3000/api/posts`
+   - Authorization 탭 → Type: Bearer Token
+   - Token: 위에서 복사한 토큰 값 붙여넣기
+
+**JavaScript (fetch) 예시**:
+```javascript
+// 1. 로그인
+const loginResponse = await fetch('http://localhost:3000/api/auth/login', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    username: 'test1',
+    password: 'test1234'
+  })
+});
+
+const loginData = await loginResponse.json();
+
+if (loginData.success) {
+  // 2. 토큰 저장 (localStorage 또는 변수에)
+  const token = loginData.token;
+  localStorage.setItem('jwt_token', token);
+  
+  console.log('로그인 성공! 토큰:', token);
+  console.log('사용자 정보:', loginData.user);
+  
+  // 3. 토큰을 사용하여 다른 API 호출
+  const postsResponse = await fetch('http://localhost:3000/api/posts', {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  
+  const postsData = await postsResponse.json();
+  console.log('게시글 목록:', postsData);
+} else {
+  console.error('로그인 실패:', loginData.message);
 }
 ```
 
@@ -279,8 +336,6 @@ Content-Type: application/json
   "message": "서버 오류가 발생했습니다."
 }
 ```
-
-**⚠️ 토큰 저장**: 응답받은 `token` 값을 이후 API 호출 시 헤더에 포함해야 합니다.
 
 ---
 

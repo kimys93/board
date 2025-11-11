@@ -6,7 +6,6 @@ Node.js, Express, MySQL을 사용한 테스트 자동화 코드 연습을 위한
 ## 🚀 주요 기능
 
 ### 인증 및 사용자 관리
-- **사이트 접속 인증** - HTTP Basic Authentication (모든 IP 허용)
 - **회원가입 및 로그인** - JWT 기반 인증
 - **프로필 관리** - 사용자 정보 수정, 프로필 이미지 업로드
 - **비밀번호 변경** - 보안을 위한 비밀번호 변경 기능
@@ -80,8 +79,7 @@ board/
 ├── config/
 │   └── database.js        # 데이터베이스 설정
 ├── middleware/
-│   ├── auth.js           # JWT 인증 미들웨어
-│   └── siteAuth.js       # 사이트 접속 인증 (HTTP Basic Auth)
+│   └── auth.js           # JWT 인증 미들웨어
 ├── routes/               # API 라우트
 │   ├── auth.js          # 인증 관련 (회원가입, 로그인, 프로필)
 │   ├── posts.js         # 게시글 관련
@@ -122,21 +120,7 @@ cp env.example .env
 # .env 파일 편집하여 데이터베이스 설정 확인
 ```
 
-### 3. 사이트 접속 인증 설정
-
-```bash
-# siteAuth.credentials 파일 생성
-cp siteAuth.credentials.example siteAuth.credentials
-
-# siteAuth.credentials 파일 편집하여 실제 ID/PW 입력
-# SITE_ID=your_id
-# SITE_PW=your_password
-```
-
-> ⚠️ **중요**: `siteAuth.credentials` 파일은 `.gitignore`에 포함되어 GitHub에 푸시되지 않습니다.  
-> 이 파일에는 사이트 접속 인증에 사용되는 ID/PW가 저장되므로 절대 공개 저장소에 커밋하지 마세요.
-
-### 4. Docker로 실행
+### 3. Docker로 실행
 
 ```bash
 # 모든 서비스 시작 (MySQL, Node.js, Jenkins)
@@ -146,15 +130,13 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
-### 5. 개별 서비스 접속
+### 4. 개별 서비스 접속
 
 - **웹 애플리케이션**: http://localhost:3000
-  - 접속 시 HTTP Basic Authentication 다이얼로그 표시
-  - `siteAuth.credentials` 파일에 설정한 ID/PW 입력
 - **Jenkins**: http://localhost:8080
 - **MySQL**: localhost:3306
 
-### 6. 네트워크 환경 및 접속 제한
+### 5. 네트워크 환경 및 접속 제한
 
 > ⚠️ **중요**: 현재 서버는 **로컬 네트워크(WiFi)에서만 접속 가능**합니다.
 
@@ -202,36 +184,7 @@ npm run dev
 
 이 프로젝트는 Jenkins를 사용한 CI/CD 파이프라인을 지원합니다.
 
-#### 1. Jenkins Credentials 설정
-
-Jenkins에서 빌드 파이프라인을 실행하기 전에 다음 Credentials를 설정해야 합니다:
-
-1. **Jenkins 관리** → **Credentials** → **System** → **Global credentials** 이동
-
-2. **Add Credentials** 클릭하여 다음 두 개의 Credentials를 생성:
-
-   **첫 번째 Credential (SITE_ID용):**
-   - **Kind**: Secret text
-   - **Scope**: Global
-   - **Secret**: `ID`
-   - **ID**: `site-auth-id` (반드시 이 ID를 사용해야 함)
-   - **Description**: Site authentication ID
-
-   **두 번째 Credential (SITE_PW용):**
-   - **Kind**: Secret text
-   - **Scope**: Global
-   - **Secret**: `password`
-   - **ID**: `site-auth-pw` (반드시 이 ID를 사용해야 함)
-   - **Description**: Site authentication Password
-
-3. **OK** 클릭하여 저장
-
-> ⚠️ **중요**: 
-> - Credentials ID는 반드시 `site-auth-id`와 `site-auth-pw`로 설정해야 합니다.
-> - Jenkinsfile에서 이 ID를 사용하여 credentials를 참조합니다.
-> - Secret 값은 실제 사용할 SITE_ID와 SITE_PW로 변경하세요.
-
-#### 2. Jenkins Pipeline 프로젝트 생성
+#### 1. Jenkins Pipeline 프로젝트 생성
 
 1. **새 Item** 클릭
 2. **Pipeline** 선택
@@ -242,28 +195,27 @@ Jenkins에서 빌드 파이프라인을 실행하기 전에 다음 Credentials�
 7. **Script Path**에 `Jenkinsfile` 입력
 8. **Save** 클릭
 
-#### 3. 빌드 파라미터
+#### 2. 빌드 파라미터
 
 Pipeline에는 다음 파라미터가 포함되어 있습니다:
 
 - **reset_db**: DB 데이터를 초기화하고 서버를 재시작합니다 (기본값: false)
   - `true`로 설정하면 모든 데이터가 삭제됩니다!
 
-#### 4. 빌드 실행
+#### 3. 빌드 실행
 
 1. 프로젝트 페이지에서 **Build with Parameters** 클릭
 2. **reset_db** 옵션 선택 (필요한 경우)
 3. **Build** 클릭
 
-#### 5. 빌드 단계
+#### 4. 빌드 단계
 
 Pipeline은 다음 단계로 구성되어 있습니다:
 
-1. **Setup**: `siteAuth.credentials` 파일 생성
-2. **Build**: Docker 이미지 빌드
-3. **Deploy**: 컨테이너 배포 및 서버 상태 확인
+1. **Build**: Docker 이미지 빌드
+2. **Deploy**: 컨테이너 배포 및 서버 상태 확인
 
-#### 6. 배포 확인
+#### 5. 배포 확인
 
 빌드가 성공하면 다음 주소에서 서버에 접속할 수 있습니다:
 
@@ -384,43 +336,10 @@ docker exec -it board_db mysql -u board_user -p board_db
 
 ## 🔐 인증 및 보안
 
-- **HTTP Basic Authentication** - 사이트 접속 시 ID/PW 인증 (모든 IP 허용)
 - **JWT 토큰** - 24시간 유효 기간
 - **비밀번호 해싱** - bcryptjs 사용
 - **입력 검증** - express-validator 사용
 - **파일 업로드 제한** - 이미지 파일만 허용 (최대 10MB)
-
-### 사이트 접속 인증
-
-사이트 접속 시 브라우저 기본 인증 다이얼로그가 표시됩니다.
-
-#### 인증 정보 설정
-
-1. `siteAuth.credentials.example` 파일을 `siteAuth.credentials`로 복사:
-   ```bash
-   cp siteAuth.credentials.example siteAuth.credentials
-   ```
-
-2. `siteAuth.credentials` 파일을 편집하여 실제 ID/PW 입력:
-   ```
-   SITE_ID=your_id
-   SITE_PW=your_password
-   ```
-
-3. Docker 컨테이너 재시작:
-   ```bash
-   docker-compose restart web
-   ```
-
-#### 인증 방식
-- **HTTP Basic Authentication**: 브라우저 기본 인증 다이얼로그 사용
-- **쿠키 기반 세션**: 인증 성공 후 24시간 동안 쿠키로 세션 유지 (cookie-parser 사용)
-- **네트워크 무관**: WiFi와 모바일 데이터 모두에서 동일하게 작동 (단, 로컬 네트워크 접속 제한은 유지)
-
-> ⚠️ **보안 주의사항**:
-> - `siteAuth.credentials` 파일은 절대 GitHub에 커밋하지 마세요
-> - 프로덕션 환경에서는 반드시 강력한 비밀번호를 사용하세요
-> - 정기적으로 비밀번호를 변경하세요
 
 ## 🎯 주요 업데이트 내역
 
@@ -433,7 +352,7 @@ docker exec -it board_db mysql -u board_user -p board_db
 - ✅ WebSocket을 통한 채팅 메시지 브로드캐스트
 
 ### v2.1
-- ✅ IP 필터링 제거 (외부 접속 완전 허용)
+- ✅ 사이트 접속 인증 제거 (HTTP Basic Authentication 제거)
 - ✅ 코드 정리 및 최적화
 
 ### v2.0
@@ -465,8 +384,3 @@ docker exec -it board_db mysql -u board_user -p board_db
 - **로컬 네트워크 제한**: 현재 서버는 같은 WiFi 네트워크에 연결된 기기에서만 접속 가능합니다.
 - **5G/LTE 접속 불가**: 모바일 데이터 네트워크에서는 접속할 수 없습니다.
 - **보안상 이점**: 이 설정은 외부 공격을 차단하여 보안을 강화합니다.
-
-### 인증 설정
-- **siteAuth.credentials 필수**: 서버 실행 전 반드시 `siteAuth.credentials` 파일을 설정해야 합니다.
-- **파일 보안**: `siteAuth.credentials` 파일은 절대 공개 저장소에 커밋하지 마세요.
-- **비밀번호 강도**: 프로덕션 환경에서는 반드시 강력한 비밀번호를 사용하세요.
