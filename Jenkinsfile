@@ -39,30 +39,36 @@ pipeline {
                     bat "docker compose -f ${DOCKER_COMPOSE_FILE} up -d"
                     
                     // Wait for containers to start
-                    sleep time: 3, unit: 'SECONDS'
+                    sleep time: 5, unit: 'SECONDS'
                     
                     // Check server status
                     echo 'Waiting for server to start...'
                     def status = ''
-                    def maxRetries = 10
-                    def retryDelay = 3
+                    def maxRetries = 5
+                    def retryDelay = 5
                     
                     for (int i = 0; i < maxRetries; i++) {
                         try {
-                            status = bat(script: "curl -o nul -s -w \"%%{http_code}\" http://localhost:${SERVICE_PORT} 2>nul", returnStdout: true).trim()
-                            if (!status || status.isEmpty()) {
+                            def result = bat(script: "@echo off & curl -o nul -s -w \"%%{http_code}\" http://localhost:${SERVICE_PORT} 2>nul", returnStdout: true)
+                            // bat 출력에서 실제 HTTP 코드만 추출 (마지막 줄의 숫자만)
+                            status = result.trim().split('\n').last().replaceAll(/[^0-9]/, '')
+                            if (!status || status.isEmpty() || status.length() != 3) {
                                 status = '000'
                             }
                         } catch (Exception e) {
                             status = '000'
                         }
                         
+                        echo "Status check attempt ${i + 1}/${maxRetries}: ${status}"
+                        
                         if (status == '200') {
                             echo "Server started successfully. (Status code: ${status})"
                             break
                         } else {
-                            echo "Server not ready yet. Retrying in ${retryDelay} seconds... (Attempt ${i + 1}/${maxRetries})"
-                            sleep time: retryDelay, unit: 'SECONDS'
+                            if (i < maxRetries - 1) {
+                                echo "Server not ready yet. Retrying in ${retryDelay} seconds..."
+                                sleep time: retryDelay, unit: 'SECONDS'
+                            }
                         }
                     }
                     
