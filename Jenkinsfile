@@ -12,25 +12,9 @@ pipeline {
     environment {
         DOCKER_COMPOSE_FILE = './docker-compose.yml'
         SERVICE_PORT = '3000'
-        SITE_ID = credentials('site-auth-id')
-        SITE_PW = credentials('site-auth-pw')
     }
     
     stages {
-        stage('Setup') {
-            steps {
-                script {
-                    // Create siteAuth.credentials file
-                    if (!fileExists('siteAuth.credentials')) {
-                        writeFile file: 'siteAuth.credentials', text: "SITE_ID=${env.SITE_ID}\nSITE_PW=${env.SITE_PW}\n"
-                        echo 'siteAuth.credentials file created.'
-                    } else {
-                        echo 'siteAuth.credentials file already exists.'
-                    }
-                }
-            }
-        }
-        
         stage('Build') {
             steps {
                 bat "docker compose -f ${DOCKER_COMPOSE_FILE} build"
@@ -73,7 +57,7 @@ pipeline {
                             status = '000'
                         }
                         
-                        if (status == '200' || status == '401') {
+                        if (status == '200') {
                             echo "Server started successfully. (Status code: ${status})"
                             break
                         } else {
@@ -82,7 +66,7 @@ pipeline {
                         }
                     }
                     
-                    if (status != '200' && status != '401') {
+                    if (status != '200') {
                         echo "Server status check failed. (Status code: ${status})"
                         bat 'docker logs board_web --tail 30'
                     }
