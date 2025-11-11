@@ -28,7 +28,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=development
-      - DB_HOST=db
+      - DB_HOST=board_db
       - DB_USER=board_user
       - DB_PASSWORD=board_password
       - DB_NAME=board_db

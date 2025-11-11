@@ -7,9 +7,6 @@ const WebSocket = require('ws');
 const http = require('http');
 require('dotenv').config();
 
-// 사이트 접속 인증 미들웨어 가져오기
-const { siteAuth } = require('./middleware/siteAuth');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -32,10 +29,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/static', express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// 사이트 접속 인증 미들웨어 적용 (HTTP Basic Authentication)
-app.use(siteAuth);
-console.log('🔒 HTTP Basic Authentication이 활성화되었습니다.');
 
 // 라우트 설정
 app.use('/api/auth', require('./routes/auth'));
