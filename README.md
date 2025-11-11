@@ -433,8 +433,6 @@ docker exec -it board_db mysql -u board_user -p board_db
 - ✅ WebSocket을 통한 채팅 메시지 브로드캐스트
 
 ### v2.1
-- ✅ HTTP Basic Authentication 추가 (모든 IP 허용)
-- ✅ 쿠키 기반 세션 관리 추가 (cookie-parser) - 모바일 네트워크 호환성 개선
 - ✅ IP 필터링 제거 (외부 접속 완전 허용)
 - ✅ 코드 정리 및 최적화
 
