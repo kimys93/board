@@ -238,7 +238,7 @@ router.post('/login', [
 
         // 사용자 조회
         const [users] = await pool.query(
-            'SELECT id, user_id, name, email, password FROM users WHERE user_id = ? OR email = ?',
+            'SELECT id, user_id, name, email, password, is_banned FROM users WHERE user_id = ? OR email = ?',
             [username, username]
         );
 
@@ -250,6 +250,14 @@ router.post('/login', [
         }
 
         const user = users[0];
+
+        // 이용 제재 확인
+        if (user.is_banned === 1 || user.is_banned === true) {
+            return res.status(403).json({
+                success: false,
+                message: '이용이 제재된 계정입니다. 관리자에게 문의하세요.'
+            });
+        }
 
         // 비밀번호 확인
         const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -311,9 +319,13 @@ router.post('/login', [
 // 사용자 정보 조회
 router.get('/me', require('../middleware/auth').authenticateToken, async (req, res) => {
     try {
+        const user = {
+            ...req.user,
+            isAdmin: req.user.user_id === 'admin' || req.user.user_id === 'administrator'
+        };
         res.json({
             success: true,
-            user: req.user
+            user: user
         });
     } catch (error) {
         console.error('사용자 정보 조회 오류:', error);

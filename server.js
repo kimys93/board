@@ -37,6 +37,8 @@ app.use('/api/comments', require('./routes/comments'));
 app.use('/api/upload', require('./routes/upload'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/chat', require('./routes/chat'));
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/bug-settings', require('./routes/bug-settings'));
 
 // 게시글 상세 페이지 라우트
 app.get('/posts/:id', (req, res) => {
@@ -76,6 +78,11 @@ app.get('/chat', (req, res) => {
 // 알림 설정 페이지 라우트
 app.get('/notifications', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'notifications.html'));
+});
+
+// 회원 관리 페이지 라우트
+app.get('/admin/users', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin', 'users.html'));
 });
 
 // 게시글 작성 페이지 라우트

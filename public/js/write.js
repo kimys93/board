@@ -108,6 +108,8 @@ function validateFileInput(event) {
 }
 
 // 게시글 작성 처리
+let isSubmitting = false; // 중복 제출 방지 플래그
+
 async function handleWritePost(e) {
     e.preventDefault();
     
@@ -116,9 +118,27 @@ async function handleWritePost(e) {
         return;
     }
     
+    // bts_2: 게시글 작성 후 페이지 리다이렉트가 되지 않음 (중복 제출 가능)
+    const bts2 = await window.getBugSetting('bts_2');
+    
+    if (!bts2 && isSubmitting) {
+        return; // 정상: 중복 제출 방지
+    }
+    
+    if (!bts2) {
+        isSubmitting = true;
+    }
+    
     const title = document.getElementById('postTitle').value;
     const content = document.getElementById('postContent').value;
     const files = document.getElementById('fileInput').files;
+    const submitButton = document.querySelector('button[type="submit"]');
+    
+    if (!bts2 && submitButton) {
+        // 정상: 버튼 비활성화
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>작성 중...';
+    }
     
     try {
         showLoading(true);
@@ -138,15 +158,40 @@ async function handleWritePost(e) {
                     await uploadFile(postId, file);
                 } catch (error) {
                     showToast(error.message, 'error');
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = '<i class="fas fa-save me-1"></i>작성';
+                    }
+                    if (!bts2) {
+                        isSubmitting = false;
+                    }
                     return; // 파일 업로드 실패 시 중단
                 }
             }
         }
         
         showToast('게시글이 작성되었습니다.', 'success');
-        window.location.href = `/posts/${postId}`;
+        
+        // bts_2: 게시글 작성 후 페이지 리다이렉트가 되지 않음
+        if (!bts2) {
+            window.location.href = `/posts/${postId}`;
+        } else {
+            // 버그: 리다이렉트하지 않아서 버튼을 여러 번 클릭할 수 있음
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.innerHTML = '<i class="fas fa-save me-1"></i>작성';
+            }
+            isSubmitting = false;
+        }
     } catch (error) {
         showToast(error.message, 'error');
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = '<i class="fas fa-save me-1"></i>작성';
+        }
+        if (!bts2) {
+            isSubmitting = false;
+        }
     } finally {
         showLoading(false);
     }

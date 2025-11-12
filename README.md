@@ -7,9 +7,10 @@ Node.js, Express, MySQL을 사용한 테스트 자동화 코드 연습을 위한
 
 ### 인증 및 사용자 관리
 - **회원가입 및 로그인** - JWT 기반 인증
-- **프로필 관리** - 사용자 정보 수정, 프로필 이미지 업로드
+- **프로필 관리** - 사용자 정보 수정
 - **비밀번호 변경** - 보안을 위한 비밀번호 변경 기능
 - **사용자 온라인 상태** - 실시간 온라인/오프라인 상태 표시
+- **관리자 기능** - 회원 관리 (이용 제재, 회원 삭제), 버그 설정 관리
 
 ### 게시판 기능
 - **게시글 관리** - CRUD 기능 (작성, 조회, 수정, 삭제)
@@ -36,6 +37,13 @@ Node.js, Express, MySQL을 사용한 테스트 자동화 코드 연습을 위한
 ### UI/UX
 - **반응형 디자인** - Bootstrap 5 사용
 - **실시간 상태 업데이트** - 사용자 온라인 상태 실시간 표시
+
+### 관리자 기능
+- **회원 관리** - 회원 목록 조회, 이용 제재, 회원 삭제
+- **버그 설정 관리** - 자동화 테스트 연습을 위한 버그 ON/OFF 설정
+  - 개별 버그 활성화/비활성화
+  - 전체 버그 한 번에 활성화/비활성화
+  - 10가지 UI/기능적 버그 제공
 
 ## 🛠 기술 스택
 
@@ -86,11 +94,19 @@ board/
 │   ├── comments.js      # 댓글 관련
 │   ├── chat.js          # 채팅 관련
 │   ├── notifications.js # 알림 관련
-│   └── upload.js        # 파일 업로드
+│   ├── upload.js        # 파일 업로드
+│   ├── admin.js         # 관리자 기능 (회원 관리)
+│   └── bug-settings.js  # 버그 설정 관리
+├── middleware/
+│   ├── auth.js          # JWT 인증 미들웨어
+│   └── admin.js         # 관리자 권한 체크 미들웨어
 ├── database/
 │   └── init.sql         # 데이터베이스 초기화
 ├── uploads/             # 업로드된 파일
-│   └── profiles/        # 프로필 이미지
+├── public/
+│   └── admin/
+│       └── users.html   # 관리자 페이지 (회원 관리, 버그 설정)
+├── system_setting.json  # 버그 설정 JSON 파일
 ├── server.js            # Express 서버 및 WebSocket 설정
 ├── docker-compose.yml   # Docker Compose 설정
 ├── Dockerfile          # Node.js 컨테이너 설정
@@ -298,6 +314,18 @@ docker exec -it board_db mysql -u board_user -p board_db
 - `GET /api/upload/:filename` - 파일 다운로드
 - `DELETE /api/upload/:id` - 파일 삭제
 
+### 관리자 API
+
+- `GET /api/admin/users` - 회원 목록 조회 (관리자만)
+- `PUT /api/admin/users/:id/ban` - 회원 이용 제재/해제 (관리자만)
+- `DELETE /api/admin/users/:id` - 회원 삭제 (관리자만)
+
+### 버그 설정 API
+
+- `GET /api/bug-settings/bugs` - 버그 설정 목록 조회 (관리자만)
+- `GET /api/bug-settings/bug/:bugKey` - 특정 버그 설정 조회 (공개)
+- `PUT /api/bug-settings/bugs/:bugKey` - 버그 설정 토글 (관리자만)
+
 ## 🔌 WebSocket 이벤트
 
 서버는 WebSocket을 통해 실시간 통신을 지원합니다.
@@ -331,6 +359,7 @@ docker exec -it board_db mysql -u board_user -p board_db
 - `notifications` - 알림
 - `notification_settings` - 알림 설정
 - `user_status` - 사용자 온라인 상태
+- `system_settings` - 시스템 설정 (버그 설정 포함)
 
 자세한 스키마는 [database/init.sql](./database/init.sql)을 참조하세요.
 
@@ -343,7 +372,16 @@ docker exec -it board_db mysql -u board_user -p board_db
 
 ## 🎯 주요 업데이트 내역
 
-### v2.2 (최신)
+### v2.3 (최신)
+- ✅ 관리자 기능 추가 (회원 관리, 버그 설정)
+- ✅ 자동화 테스트 연습을 위한 버그 관리 시스템
+  - 10가지 UI/기능적 버그 제공
+  - 개별/전체 버그 ON/OFF 기능
+  - 관리자 전용 버그 설정 페이지
+- ✅ 회원 이용 제재 기능
+- ✅ 회원 삭제 기능 (게시글/댓글 CASCADE 삭제)
+
+### v2.2
 - ✅ 실시간 채팅 메시지 표시 기능 추가
 - ✅ 채팅 중일 때 알림 생성하지 않기 (서버에서 사용자 뷰 상태 추적)
 - ✅ 로그인/로그아웃 시 실시간 온라인 상태 반영

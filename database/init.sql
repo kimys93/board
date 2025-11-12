@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
     gender ENUM('male', 'female', 'other') NOT NULL,
     phone VARCHAR(20) NOT NULL,
     profile_image VARCHAR(500) NULL,
+    is_banned TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -116,6 +117,28 @@ CREATE TABLE IF NOT EXISTS user_status (
     last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+-- 시스템 설정 테이블 (버그 설정 포함)
+CREATE TABLE IF NOT EXISTS system_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    setting_key VARCHAR(100) UNIQUE NOT NULL,
+    setting_value TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 버그 설정 초기 데이터 삽입
+INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES 
+('bts_1', 0), -- 검색 시 항상 '게시글이 없습니다' 페이지가 노출됨
+('bts_2', 0), -- 게시글 작성 후 페이지 리다이렉트가 되지 않음 (중복 제출 가능)
+('bts_3', 0), -- 페이지네이션 오류 (잘못된 페이지 표시)
+('bts_4', 0), -- 게시글 목록이 오름차순으로 표시됨
+('bts_5', 0), -- 파일 업로드 후 파일 목록이 갱신되지 않음
+('bts_6', 0), -- 알림이 중복으로 표시됨
+('bts_7', 0), -- 게시글 작성 시간이 UTC 시간 기준으로 표시됨
+('bts_8', 0), -- 댓글 작성 후 목록 갱신 안 됨
+('bts_9', 0), -- 게시글 상세 페이지에서 조회수가 표시되지 않음
+('bts_10', 0); -- 채팅 메시지가 두 개씩 전송됨
 
 -- 인덱스 생성 (중복 시 에러 방지)
 CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author_id);

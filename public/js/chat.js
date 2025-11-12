@@ -446,6 +446,9 @@ async function sendMessage() {
     
     if (!message || !currentRoomId) return;
     
+    // bts_10: 채팅 메시지가 두 개씩 전송됨
+    const bts10 = await getBugSetting('bts_10');
+    
     try {
         const response = await fetch('/api/chat/message', {
             method: 'POST',
@@ -461,6 +464,23 @@ async function sendMessage() {
         
         if (response.ok) {
             messageInput.value = '';
+            
+            // bts_10: 채팅 메시지가 두 개씩 전송됨
+            if (bts10) {
+                // 버그: 같은 메시지를 한 번 더 전송
+                await fetch('/api/chat/message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        roomId: currentRoomId,
+                        message: message
+                    })
+                });
+            }
+            
             // WebSocket으로 메시지가 브로드캐스트되므로 loadMessages()는 호출하지 않음
             // 대신 채팅방 목록만 업데이트
             loadChatRooms(); // 채팅방 목록 새로고침

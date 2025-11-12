@@ -2198,6 +2198,290 @@ DELETE /api/upload/1
 
 ---
 
+## 7. 관리자 (Admin) - `/api/admin`
+
+> ⚠️ **주의**: 모든 관리자 API는 관리자 권한이 필요합니다. (`user_id`가 `admin` 또는 `administrator`인 사용자만 접근 가능)
+
+### 7.1 회원 목록 조회
+**GET** `/api/admin/users`
+
+**Headers**:
+```
+Authorization: Bearer {jwt_token}
+```
+
+**Query Parameters** (선택):
+- `page`: 페이지 번호 (기본값: 1)
+- `limit`: 페이지당 항목 수 (기본값: 10)
+- `search`: 검색어 (이름, ID, 이메일)
+
+**예시**:
+```
+GET /api/admin/users?page=1&limit=10&search=test
+```
+
+**성공 응답** (200):
+```json
+{
+  "success": true,
+  "data": {
+    "users": [
+      {
+        "id": 1,
+        "user_id": "testuser",
+        "name": "테스트 사용자",
+        "email": "test@example.com",
+        "phone": "010-1234-5678",
+        "gender": "male",
+        "is_banned": 0,
+        "created_at": "2024-01-01T00:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "totalUsers": 1,
+      "totalPages": 1
+    }
+  }
+}
+```
+
+**에러 응답** (403) - 관리자 권한 없음:
+```json
+{
+  "success": false,
+  "message": "관리자 권한이 필요합니다."
+}
+```
+
+---
+
+### 7.2 회원 이용 제재/해제
+**PUT** `/api/admin/users/:id/ban`
+
+**Headers**:
+```
+Authorization: Bearer {jwt_token}
+Content-Type: application/json
+```
+
+**Path Parameters**:
+- `id`: 회원 ID
+
+**Body**:
+```json
+{
+  "is_banned": true
+}
+```
+
+**예시**:
+```
+PUT /api/admin/users/2/ban
+Body: {"is_banned": true}
+```
+
+**성공 응답** (200):
+```json
+{
+  "success": true,
+  "message": "회원이 제재되었습니다."
+}
+```
+
+**에러 응답** (403) - 관리자 권한 없음:
+```json
+{
+  "success": false,
+  "message": "관리자 권한이 필요합니다."
+}
+```
+
+**에러 응답** (400) - 자기 자신 제재 시도:
+```json
+{
+  "success": false,
+  "message": "자기 자신을 제재할 수 없습니다."
+}
+```
+
+---
+
+### 7.3 회원 삭제
+**DELETE** `/api/admin/users/:id`
+
+**Headers**:
+```
+Authorization: Bearer {jwt_token}
+```
+
+**Path Parameters**:
+- `id`: 회원 ID
+
+**예시**:
+```
+DELETE /api/admin/users/2
+```
+
+**성공 응답** (200):
+```json
+{
+  "success": true,
+  "message": "회원이 삭제되었습니다."
+}
+```
+
+**에러 응답** (403) - 관리자 권한 없음:
+```json
+{
+  "success": false,
+  "message": "관리자 권한이 필요합니다."
+}
+```
+
+**에러 응답** (400) - 자기 자신 삭제 시도:
+```json
+{
+  "success": false,
+  "message": "자기 자신을 삭제할 수 없습니다."
+}
+```
+
+**에러 응답** (400) - 관리자 계정 삭제 시도:
+```json
+{
+  "success": false,
+  "message": "관리자 계정은 삭제할 수 없습니다."
+}
+```
+
+---
+
+## 8. 버그 설정 (Bug Settings) - `/api/bug-settings`
+
+### 8.1 버그 설정 목록 조회 (관리자만)
+**GET** `/api/bug-settings/bugs`
+
+> ⚠️ **주의**: 관리자 권한이 필요합니다.
+
+**Headers**:
+```
+Authorization: Bearer {jwt_token}
+```
+
+**예시**:
+```
+GET /api/bug-settings/bugs
+```
+
+**성공 응답** (200):
+```json
+{
+  "success": true,
+  "bugs": [
+    {
+      "bug_name": "bts_1",
+      "is_enabled": false
+    },
+    {
+      "bug_name": "bts_2",
+      "is_enabled": false
+    }
+  ]
+}
+```
+
+**에러 응답** (403) - 관리자 권한 없음:
+```json
+{
+  "success": false,
+  "message": "관리자 권한이 필요합니다."
+}
+```
+
+---
+
+### 8.2 특정 버그 설정 조회 (공개)
+**GET** `/api/bug-settings/bug/:bugKey`
+
+> ℹ️ **참고**: 이 API는 공개 API입니다. 인증 토큰이 필요하지 않습니다.
+
+**Path Parameters**:
+- `bugKey`: 버그 키 (예: `bts_1`, `bts_2`, ...)
+
+**예시**:
+```
+GET /api/bug-settings/bug/bts_1
+```
+
+**성공 응답** (200):
+```json
+{
+  "success": true,
+  "is_enabled": false
+}
+```
+
+**버그 키 목록**:
+- `bts_1`: 검색 시 항상 "게시글이 없습니다" 페이지가 노출됨
+- `bts_2`: 게시글 작성 후 페이지 리다이렉트가 되지 않음 (중복 제출 가능)
+- `bts_3`: 페이지네이션 오류 (잘못된 페이지 표시)
+- `bts_4`: 게시글 목록이 오름차순으로 표시됨
+- `bts_5`: 파일 업로드 후 파일 목록이 갱신되지 않음
+- `bts_6`: 알림이 중복으로 표시됨
+- `bts_7`: 게시글 작성 시간이 UTC 시간 기준으로 표시됨
+- `bts_8`: 댓글 작성 후 목록 갱신 안 됨
+- `bts_9`: 게시글 상세 페이지에서 조회수가 표시되지 않음
+- `bts_10`: 채팅 메시지가 두 개씩 전송됨
+
+---
+
+### 8.3 버그 설정 토글 (관리자만)
+**PUT** `/api/bug-settings/bugs/:bugKey`
+
+> ⚠️ **주의**: 관리자 권한이 필요합니다.
+
+**Headers**:
+```
+Authorization: Bearer {jwt_token}
+Content-Type: application/json
+```
+
+**Path Parameters**:
+- `bugKey`: 버그 키 (예: `bts_1`, `bts_2`, ...)
+
+**Body**:
+```json
+{
+  "is_enabled": true
+}
+```
+
+**예시**:
+```
+PUT /api/bug-settings/bugs/bts_1
+Body: {"is_enabled": true}
+```
+
+**성공 응답** (200):
+```json
+{
+  "success": true,
+  "message": "버그 \"bts_1\"가 활성화되었습니다."
+}
+```
+
+**에러 응답** (403) - 관리자 권한 없음:
+```json
+{
+  "success": false,
+  "message": "관리자 권한이 필요합니다."
+}
+```
+
+---
+
 ## 테스트 시나리오 예시
 
 ### 시나리오 1: 회원가입 → 로그인 → 게시글 작성

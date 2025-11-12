@@ -28,7 +28,7 @@ function setupEventListeners() {
     });
     
     // 검색 버튼
-    document.getElementById('searchBtn').addEventListener('click', function() {
+    document.getElementById('searchBtn').addEventListener('click', async function() {
         const searchInput = document.getElementById('searchInput');
         const originalValue = searchInput.value;
         const searchTerm = originalValue.trim();
@@ -49,7 +49,7 @@ function setupEventListeners() {
     });
     
     // 검색 입력 엔터키
-    document.getElementById('searchInput').addEventListener('keypress', function(e) {
+    document.getElementById('searchInput').addEventListener('keypress', async function(e) {
         if (e.key === 'Enter') {
             const originalValue = this.value;
             const searchTerm = originalValue.trim();
@@ -76,7 +76,15 @@ async function loadPosts(page = 1) {
     try {
         showLoading(true);
         
-        const response = await fetch(`/api/posts?page=${page}`);
+        // bts_3: 페이지네이션 오류 (잘못된 페이지 표시)
+        const bts3 = await getBugSetting('bts_3');
+        let actualPage = page;
+        if (bts3) {
+            // 버그: 페이지 번호가 1씩 밀림
+            actualPage = page + 1;
+        }
+        
+        const response = await fetch(`/api/posts?page=${actualPage}`);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -86,7 +94,16 @@ async function loadPosts(page = 1) {
         console.log('API 응답 데이터:', data); // 디버깅용
         
         if (data.success) {
-            displayPosts(data.data?.posts || []);
+            // bts_4: 게시글 목록이 역순으로 표시됨
+            const bts4 = await window.getBugSetting('bts_4');
+            let posts = data.data?.posts || [];
+            
+            if (bts4) {
+                // 버그: 게시글 목록을 역순으로 표시
+                posts = posts.reverse();
+            }
+            
+            await displayPosts(posts);
             displayPagination(data.data?.pagination || {});
             updatePostCount(data.data?.pagination?.totalPosts || 0);
         } else {
@@ -115,6 +132,19 @@ async function searchPosts(searchTerm) {
             return;
         }
         
+        // bts_1: 검색 시 항상 '게시글이 없습니다' 페이지가 노출됨
+        const bts1 = await window.getBugSetting('bts_1');
+        console.log('bts_1 설정 확인:', bts1); // 디버깅용
+        if (bts1) {
+            // 버그: 검색 결과를 항상 빈 배열로 표시하여 "게시글이 없습니다" 메시지 노출
+            console.log('bts_1 활성화됨 - 빈 결과 반환'); // 디버깅용
+            await displayPosts([]);
+            displayPagination({ page: 1, totalPages: 0, totalPosts: 0 });
+            updatePostCount(0);
+            showLoading(false);
+            return;
+        }
+        
         const searchType = document.getElementById('searchType')?.value || 'title';
         const params = new URLSearchParams();
         params.append('search', searchTerm.trim());
@@ -124,7 +154,16 @@ async function searchPosts(searchTerm) {
         const data = await response.json();
         
         if (data.success) {
-            displayPosts(data.data?.posts || []);
+            // bts_4: 게시글 목록이 역순으로 표시됨 (검색 결과에도 적용)
+            const bts4 = await window.getBugSetting('bts_4');
+            let posts = data.data?.posts || [];
+            
+            if (bts4) {
+                // 버그: 게시글 목록을 역순으로 표시
+                posts = posts.reverse();
+            }
+            
+            await displayPosts(posts);
             displayPagination(data.data?.pagination || {});
             updatePostCount(data.data?.pagination?.totalPosts || 0);
         } else {
@@ -139,7 +178,7 @@ async function searchPosts(searchTerm) {
 }
 
 // 게시글 목록 표시
-function displayPosts(posts) {
+async function displayPosts(posts) {
     const tbody = document.getElementById('postsList');
     
     // posts가 undefined이거나 null인 경우 처리
@@ -166,7 +205,13 @@ function displayPosts(posts) {
         return;
     }
     
-    tbody.innerHTML = posts.map(post => `
+    // 날짜 포맷팅을 위해 Promise.all 사용
+    const postsWithDates = await Promise.all(posts.map(async (post) => ({
+        ...post,
+        formattedDate: await formatDate(post.created_at)
+    })));
+    
+    tbody.innerHTML = postsWithDates.map(post => `
         <tr class="align-middle">
             <td class="text-center">
                 <span class="badge bg-secondary">${post.id}</span>
@@ -181,7 +226,7 @@ function displayPosts(posts) {
                 <span class="badge bg-primary">${post.author_name || '알 수 없음'}</span>
             </td>
             <td class="text-center text-muted">
-                <small>${formatDate(post.created_at)}</small>
+                <small>${post.formattedDate}</small>
             </td>
             <td class="text-center">
                 <span class="badge bg-light text-dark">
@@ -234,15 +279,8 @@ function displayPagination(pagination) {
     paginationEl.innerHTML = paginationHTML;
 }
 
-// 날짜 포맷팅
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-    });
-}
+// 날짜 포맷팅 (utils.js의 formatDate 사용)
+// board.js에서는 formatDate를 제거하고 utils.js의 것을 사용
 
 // 로딩 표시
 function showLoading(show) {

@@ -81,11 +81,21 @@ async function loadPostDetail(postId) {
         
         document.getElementById('detailTitle').textContent = post.title;
         document.getElementById('detailAuthor').textContent = post.author_name;
-        document.getElementById('detailDate').textContent = formatDate(post.created_at);
-        document.getElementById('detailViews').textContent = post.view_count;
+        document.getElementById('detailDate').textContent = await formatDate(post.created_at);
+        
+        // bts_9: 게시글 상세 페이지에서 조회수가 표시되지 않음
+        const bts9 = await window.getBugSetting('bts_9');
+        if (!bts9) {
+            // 정상: 조회수 표시
+            document.getElementById('detailViews').textContent = post.view_count;
+        } else {
+            // 버그: 조회수를 표시하지 않음
+            document.getElementById('detailViews').textContent = '';
+        }
+        
         document.getElementById('detailContent').textContent = post.content;
         
-        displayAttachments(post.attachments);
+        await displayAttachments(post.attachments);
         displayDetailActions(post.author_id);
         loadComments(postId);
     } catch (error) {
@@ -98,10 +108,18 @@ async function loadPostDetail(postId) {
 }
 
 // 첨부파일 표시
-function displayAttachments(attachments) {
+async function displayAttachments(attachments) {
     const container = document.getElementById('detailAttachments');
     
     if (!attachments || attachments.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    // bts_5: 파일 업로드 후 파일 목록이 갱신되지 않음
+    const bts5 = await window.getBugSetting('bts_5');
+    if (bts5) {
+        // 버그: 첨부파일 목록을 표시하지 않음
         container.innerHTML = '';
         return;
     }
@@ -385,7 +403,13 @@ async function handleCommentSubmit(event) {
         
         showToast('댓글이 작성되었습니다.', 'success');
         document.getElementById('commentContent').value = '';
-        loadComments(currentPostId);
+        
+        // bts_8: 댓글 작성 후 목록 갱신 안 됨
+        const bts8 = await getBugSetting('bts_8');
+        if (!bts8) {
+            // 정상: 댓글 목록 갱신
+            loadComments(currentPostId);
+        }
     } catch (error) {
         showToast(error.message, 'error');
     } finally {

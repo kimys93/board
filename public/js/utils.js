@@ -51,8 +51,28 @@ function formatFileSize(bytes) {
 }
 
 // 날짜 포맷팅
-function formatDate(dateString) {
+async function formatDate(dateString) {
     const date = new Date(dateString);
+    
+    // bts_7: 게시글 작성 시간이 UTC 시간 기준으로 표시됨
+    // 전역 함수로 사용할 수 있도록 window에 저장
+    if (typeof window.getBugSetting === 'function') {
+        const bts7 = await window.getBugSetting('bts_7');
+        
+        if (bts7) {
+            // 버그: UTC 시간 기준으로 표시 (오전/오후 형식 유지)
+            return date.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'UTC'
+            });
+        }
+    }
+    
+    // 정상: 한국 시간 기준으로 표시
     return date.toLocaleDateString('ko-KR', {
         year: 'numeric',
         month: '2-digit',

@@ -415,6 +415,22 @@ class NavBar {
         }));
     }
 
+    // 버그 설정 확인 헬퍼 함수 (공개 API 사용)
+    async getBugSetting(bugKey) {
+        try {
+            const response = await fetch(`/api/bug-settings/bug/${bugKey}`);
+            
+            if (!response.ok) return false;
+            
+            const data = await response.json();
+            if (!data.success) return false;
+            
+            return data.is_enabled || false;
+        } catch (error) {
+            return false;
+        }
+    }
+
     // 알림 처리
     async handleNotification(notification) {
         console.log('📬 알림 처리 시작:', notification);
@@ -481,6 +497,15 @@ class NavBar {
         
         // 토스트 팝업 표시
         this.showNotificationToast(notification);
+        
+        // bts_6: 알림이 중복으로 표시됨
+        const bts6 = await this.getBugSetting('bts_6');
+        if (bts6) {
+            // 버그: 같은 알림을 한 번 더 표시
+            setTimeout(() => {
+                this.showNotificationToast(notification);
+            }, 500);
+        }
         
         // 브라우저 알림 표시
         if (Notification.permission === 'granted') {
@@ -586,6 +611,13 @@ class NavBar {
                                     <i class="fas fa-comments me-1"></i>채팅
                                 </a>
                             </li>
+        ${this.user && this.user.isAdmin ? `
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/users">
+                <i class="fas fa-user-shield me-1"></i>관리자
+            </a>
+        </li>
+        ` : ''}
                         </ul>
                         ${this.user ? this.createUserMenu() : this.createAuthButtons()}
                     </div>
@@ -703,11 +735,23 @@ class NavBar {
                 link.classList.add('active');
             }
             // 채팅 페이지
-            else if (this.currentPath === '/chat' && href === '/chat') {
-                link.classList.add('active');
+            else if (this.currentPath === '/chat' && (href === '/chat' || href === '#')) {
+                // href가 #인 경우 onclick 속성으로 채팅 링크인지 확인
+                if (href === '#') {
+                    const onclick = link.getAttribute('onclick');
+                    if (onclick && onclick.includes('handleChatClick')) {
+                        link.classList.add('active');
+                    }
+                } else {
+                    link.classList.add('active');
                 }
-            });
-        }
+            }
+            // 회원 관리 페이지
+            else if (this.currentPath.startsWith('/admin/users') && href === '/admin/users') {
+                link.classList.add('active');
+            }
+        });
+    }
 }
 
 // 채팅 클릭 핸들러

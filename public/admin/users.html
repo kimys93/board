@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 - 게시판</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+    <style>
+        .user-card {
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+        .user-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        .banned-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            background-color: #dc3545;
+            color: white;
+            padding: 0.15rem 0.5rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            pointer-events: none;
+            user-select: none;
+        }
+        .admin-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            background-color: #0d6efd;
+            color: white;
+            padding: 0.15rem 0.5rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            pointer-events: none;
+            user-select: none;
+        }
+        .status-badges {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            align-items: flex-end;
+        }
+        .form-check-input:checked {
+            background-color: #dc3545;
+            border-color: #dc3545;
+        }
+        .form-check-input {
+            width: 3rem;
+            height: 1.5rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <!-- GNB는 navbar.js에서 동적 생성됩니다 -->
+
+    <!-- 메인 콘텐츠 -->
+    <div class="container mt-4">
+        <!-- 탭 네비게이션 -->
+        <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">
+                    <i class="fas fa-users me-1"></i>회원 관리
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="bugs-tab" data-bs-toggle="tab" data-bs-target="#bugs" type="button" role="tab">
+                    <i class="fas fa-bug me-1"></i>버그 설정
+                </button>
+            </li>
+        </ul>
+
+        <!-- 탭 콘텐츠 -->
+        <div class="tab-content" id="adminTabContent">
+            <!-- 회원 관리 탭 -->
+            <div class="tab-pane fade show active" id="users" role="tabpanel">
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h3><i class="fas fa-users-cog me-2"></i>회원 관리</h3>
+                        <p class="text-muted">회원 목록을 조회하고 관리할 수 있습니다.</p>
+                    </div>
+                </div>
+
+                <!-- 검색 및 필터 -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control" id="searchInput" placeholder="이름, ID, 이메일로 검색...">
+                            <button class="btn btn-primary" onclick="searchUsers()">
+                                <i class="fas fa-search me-1"></i>검색
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 회원 목록 -->
+                <div class="row" id="usersContainer">
+                    <div class="col-12 text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 페이지네이션 -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <nav aria-label="페이지 네비게이션">
+                            <ul class="pagination justify-content-center" id="pagination">
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 버그 설정 탭 -->
+            <div class="tab-pane fade" id="bugs" role="tabpanel">
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h3><i class="fas fa-bug me-2"></i>버그 설정</h3>
+                        <p class="text-muted">자동화 테스트 연습을 위한 버그를 활성화/비활성화할 수 있습니다.</p>
+                    </div>
+                </div>
+
+                <!-- 전체 제어 버튼 -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="card border-primary">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h5 class="mb-1"><i class="fas fa-sliders-h me-2"></i>전체 제어</h5>
+                                        <p class="text-muted mb-0 small">모든 버그를 한 번에 활성화/비활성화합니다.</p>
+                                    </div>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-success" onclick="toggleAllBugs(true)">
+                                            <i class="fas fa-check-circle me-1"></i>전체 활성화
+                                        </button>
+                                        <button type="button" class="btn btn-danger" onclick="toggleAllBugs(false)">
+                                            <i class="fas fa-times-circle me-1"></i>전체 비활성화
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 버그 설정 목록 -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <div id="bugsContainer">
+                                    <div class="text-center">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 회원 삭제 확인 모달 -->
+    <div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteUserModalLabel">
+                        <i class="fas fa-exclamation-triangle text-danger me-2"></i>회원 삭제 확인
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>정말로 이 회원을 삭제하시겠습니까?</p>
+                    <p class="text-danger"><strong>이 작업은 되돌릴 수 없습니다.</strong></p>
+                    <p id="deleteUserInfo" class="text-muted"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="button" class="btn btn-danger" onclick="confirmDeleteUser()">
+                        <i class="fas fa-trash me-1"></i>삭제
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 토스트 알림 -->
+    <div id="toast" class="toast position-fixed top-0 end-0 m-3" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <strong class="me-auto" id="toastTitle">알림</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body" id="toastMessage"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/admin.js"></script>
+</body>
+</html>
+
