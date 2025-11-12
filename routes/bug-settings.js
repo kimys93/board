@@ -2,8 +2,6 @@ const express = require('express');
 const { checkAdmin } = require('../middleware/admin');
 const { authenticateToken } = require('../middleware/auth');
 const pool = require('../config/database');
-const fs = require('fs');
-const path = require('path');
 
 const router = express.Router();
 
@@ -91,23 +89,6 @@ router.put('/bugs/:bugKey', authenticateToken, checkAdmin, async (req, res) => {
             'INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
             [bugKey, is_enabled ? 1 : 0, is_enabled ? 1 : 0]
         );
-
-        // JSON 파일 업데이트
-        const jsonPath = path.join(__dirname, '..', 'system_setting.json');
-        let settings = {};
-        
-        try {
-            if (fs.existsSync(jsonPath)) {
-                const fileContent = fs.readFileSync(jsonPath, 'utf8');
-                settings = JSON.parse(fileContent);
-            }
-        } catch (error) {
-            console.error('JSON 파일 읽기 오류:', error);
-        }
-
-        settings[bugKey] = is_enabled;
-        
-        fs.writeFileSync(jsonPath, JSON.stringify(settings, null, 4), 'utf8');
 
         res.json({
             success: true,

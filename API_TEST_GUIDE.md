@@ -347,8 +347,6 @@ if (loginData.success) {
 Authorization: Bearer {jwt_token}
 ```
 
-**참고**: HTTP Basic Authentication (쿠키) + JWT 토큰 필요
-
 **성공 응답** (200):
 ```json
 {
@@ -675,12 +673,7 @@ Authorization: Bearer {jwt_token}
 ### 2.1 게시글 목록 조회
 **GET** `/api/posts`
 
-**Headers**:
-```
-Authorization: Basic {base64_encoded_credentials}
-```
-
-**참고**: HTTP Basic Authentication 필요 (JWT 토큰 불필요)
+**참고**: 인증 불필요 (공개 API)
 
 **Query Parameters**:
 - `page` (optional): 페이지 번호 (기본값: 1)
@@ -737,12 +730,7 @@ GET /api/posts?search=홍길동&searchType=author
 ### 2.2 게시글 상세 조회
 **GET** `/api/posts/:id`
 
-**Headers**:
-```
-Authorization: Basic {base64_encoded_credentials}
-```
-
-**참고**: HTTP Basic Authentication 필요 (JWT 토큰 불필요)
+**참고**: 인증 불필요 (공개 API)
 
 **Path Parameters**:
 - `id`: 게시글 ID
@@ -1121,12 +1109,7 @@ Authorization: Bearer {jwt_token}
 ### 3.3 댓글 목록 조회
 **GET** `/api/comments/:postId`
 
-**Headers**:
-```
-Authorization: Basic {base64_encoded_credentials}
-```
-
-**참고**: HTTP Basic Authentication 필요 (JWT 토큰 불필요)
+**참고**: 인증 불필요 (공개 API)
 
 **Path Parameters**:
 - `postId`: 게시글 ID

@@ -106,7 +106,6 @@ board/
 ├── public/
 │   └── admin/
 │       └── users.html   # 관리자 페이지 (회원 관리, 버그 설정)
-├── system_setting.json  # 버그 설정 JSON 파일
 ├── server.js            # Express 서버 및 WebSocket 설정
 ├── docker-compose.yml   # Docker Compose 설정
 ├── Dockerfile          # Node.js 컨테이너 설정
