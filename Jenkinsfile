@@ -17,7 +17,7 @@ pipeline {
     stages {
         stage('Build') {
             steps {
-                bat "docker compose -f ${DOCKER_COMPOSE_FILE} build"
+                sh "docker compose -f ${DOCKER_COMPOSE_FILE} build"
             }
         }
         
@@ -27,16 +27,16 @@ pipeline {
                     def resetDb = params.reset_db
                     
                     // Clean up existing containers
-                    bat "@echo off & docker stop board_web board_db 2>nul & docker rm -f board_web board_db 2>nul & echo."
+                    sh "docker stop board_web board_db 2>/dev/null || true; docker rm -f board_web board_db 2>/dev/null || true"
                     
                     if (resetDb) {
                         echo 'WARNING: DB reset mode - All data will be deleted!'
-                        bat "docker compose -f ${DOCKER_COMPOSE_FILE} down -v --remove-orphans"
+                        sh "docker compose -f ${DOCKER_COMPOSE_FILE} down -v --remove-orphans"
                     } else {
-                        bat "docker compose -f ${DOCKER_COMPOSE_FILE} down --remove-orphans"
+                        sh "docker compose -f ${DOCKER_COMPOSE_FILE} down --remove-orphans"
                     }
                     
-                    bat "docker compose -f ${DOCKER_COMPOSE_FILE} up -d"
+                    sh "docker compose -f ${DOCKER_COMPOSE_FILE} up -d"
                     
                     // Wait for containers to start
                     sleep time: 5, unit: 'SECONDS'
@@ -49,9 +49,9 @@ pipeline {
                     
                     for (int i = 0; i < maxRetries; i++) {
                         try {
-                            def result = bat(script: "@echo off & curl -o nul -s -w \"%%{http_code}\" http://localhost:${SERVICE_PORT} 2>nul", returnStdout: true)
-                            // bat 출력에서 실제 HTTP 코드만 추출 (마지막 줄의 숫자만)
-                            status = result.trim().split('\n').last().replaceAll(/[^0-9]/, '')
+                            def result = sh(script: "curl -s -o /dev/null -w '%{http_code}' http://localhost:${SERVICE_PORT} 2>/dev/null || echo '000'", returnStdout: true)
+                            // sh 출력에서 실제 HTTP 코드만 추출
+                            status = result.trim()
                             if (!status || status.isEmpty() || status.length() != 3) {
                                 status = '000'
                             }
@@ -74,7 +74,7 @@ pipeline {
                     
                     if (status != '200') {
                         echo "Server status check failed. (Status code: ${status})"
-                        bat 'docker logs board_web --tail 30'
+                        sh 'docker logs board_web --tail 30'
                     }
                     
                     echo 'Deployment completed!'
@@ -86,8 +86,8 @@ pipeline {
     
     post {
         always {
-            bat '@echo off & docker logs --tail=50 board_web 2>nul & echo.'
-            bat '@echo off & docker logs --tail=50 board_db 2>nul & echo.'
+            sh 'docker logs --tail=50 board_web 2>/dev/null || true'
+            sh 'docker logs --tail=50 board_db 2>/dev/null || true'
         }
         success {
             echo 'Build successful!'
