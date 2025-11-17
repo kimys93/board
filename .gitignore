@@ -131,3 +131,6 @@ dist/
 
 # Site authentication credentials
 siteAuth.credentials
+
+# Windows-specific Jenkinsfile
+Jenkinsfile.windows
